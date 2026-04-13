@@ -4,10 +4,11 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 
-import VisitorDrawer from './VisitorDrawer';
-import MemberDrawer  from './MemberDrawer';
-import AdminDrawer   from './AdminDrawer';
-import LoginScreen   from '../screens/auth/LoginScreen'; // ← estava faltando
+import VisitorDrawer  from './VisitorDrawer';
+import MemberDrawer   from './MemberDrawer';
+import AdminDrawer    from './AdminDrawer';
+import AuthStack     from './AuthStack'; 
+
 
 const RootStack = createNativeStackNavigator();
 
@@ -27,13 +28,16 @@ export default function RootNavigator() {
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
           <>
-            <RootStack.Screen name="Login"      component={LoginScreen}   />
-            <RootStack.Screen name="VisitorApp" component={VisitorDrawer} />
-          </>
-        ) : role === 'admin' ? (
-          <RootStack.Screen name="AdminApp" component={AdminDrawer} />
-        ) : (
-          <RootStack.Screen name="MemberApp" component={MemberDrawer} />
+    <RootStack.Screen name="Auth"      component={AuthStack}   />
+    <RootStack.Screen name="VisitorApp" component={VisitorDrawer} />
+  </>
+) : role === 'admin' ? (
+  <RootStack.Screen name="AdminApp"  component={AdminDrawer}  />
+) : role === 'membro' ? (
+  <RootStack.Screen name="MemberApp" component={MemberDrawer} />
+) : (
+  // role: "pendente" ou qualquer outro → acesso de visitante
+  <RootStack.Screen name="VisitorApp" component={VisitorDrawer} />
         )}
       </RootStack.Navigator>
     </NavigationContainer>

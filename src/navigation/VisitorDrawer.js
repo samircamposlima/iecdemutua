@@ -4,6 +4,7 @@ import { createDrawerNavigator } from '@react-navigation/drawer';
 import { useNavigation } from '@react-navigation/native';
 import { themes } from '../themes';
 import CustomDrawerContent from '../components/navigation/CustomDrawerContent';
+import { useAuth } from '../contexts/AuthContext';
 
 import AgendaScreen    from '../screens/shared/AgendaScreen';
 import OracaoScreen    from '../screens/shared/OracaoScreen';
@@ -17,10 +18,12 @@ const t = themes.dark;
 
 function BotaoEntrar() {
   const navigation = useNavigation();
+   const { user, role } = useAuth();
+    if (user && role === 'pendente') return null;
   return (
     <TouchableOpacity
       style={styles.botaoEntrar}
-      onPress={() => navigation.navigate('Login')}
+      onPress={() => navigation.navigate('Auth')}
     >
       <Text style={styles.botaoEntrarTexto}>Entrar</Text>
     </TouchableOpacity>

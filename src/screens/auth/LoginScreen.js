@@ -6,6 +6,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '../../contexts/AuthContext';
 
+
 export default function LoginScreen() {
   const { signIn }     = useAuth();
   const navigation     = useNavigation();
@@ -23,6 +24,7 @@ export default function LoginScreen() {
     setErrorMessage('');
     setIsLoading(true);
     const result = await signIn(email.trim(), password);
+    console.log('resultado login:', JSON.stringify(result)); // ← adiciona aqui
     setIsLoading(false);
     if (!result.success) {
       setErrorMessage(translateFirebaseError(result.message));
@@ -34,7 +36,6 @@ export default function LoginScreen() {
     // Volta para o VisitorDrawer sem fazer login
     navigation.navigate('VisitorApp');
   }
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -93,6 +94,15 @@ export default function LoginScreen() {
         >
           <Text style={styles.buttonSecundarioTexto}>Continuar sem conta</Text>
         </TouchableOpacity>
+
+        {/* Botão criar conta */}
+        <TouchableOpacity
+          style={styles.buttonCriarConta}
+          onPress={() => navigation.navigate('Cadastro')}
+        >
+          <Text style={styles.buttonCriarContaTexto}>Criar conta</Text>
+        </TouchableOpacity>
+
       </View>
     </KeyboardAvoidingView>
   );
@@ -191,4 +201,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
   },
+buttonCriarConta: {
+  paddingVertical: 14,
+  alignItems: 'center',
+  marginTop: 8,
+},
+buttonCriarContaTexto: {
+  color: '#C9A84C',
+  fontSize: 15,
+  fontWeight: '600',
+},
+
 });

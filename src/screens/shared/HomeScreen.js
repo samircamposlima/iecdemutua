@@ -107,6 +107,19 @@ export default function HomeScreen() {
         </Text>
       </View>
 
+      {/* ── Aviso pendente ── */}
+      {role === 'pendente' && (
+        <View style={[styles.avisoPendenteCard, { backgroundColor: theme.surface }]}>
+          <Text style={[styles.avisoPendenteTitle, { color: theme.primary }]}>
+            ⏳ Acesso pendente
+          </Text>
+          <Text style={[styles.avisoPendenteText, { color: theme.textSecondary }]}>
+            Sua conta foi criada! Um administrador ainda precisa liberar seu acesso como membro.
+            Enquanto isso, você pode usar o app como visitante.
+          </Text>
+        </View>
+      )}
+
       {/* ── Próximo Evento ── */}
       {nextEvent && (
         <View style={[styles.card, { backgroundColor: theme.surface }]}>
@@ -353,4 +366,21 @@ const styles = StyleSheet.create({
     height: 1,
     marginLeft: 68,
   },
+  avisoPendenteCard: {
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 14,
+  elevation: 2,
+  borderLeftWidth: 3,
+  borderLeftColor: '#C9A84C',
+},
+avisoPendenteTitle: {
+  fontSize: 14,
+  fontWeight: '700',
+  marginBottom: 6,
+},
+avisoPendenteText: {
+  fontSize: 13,
+  lineHeight: 20,
+},
 });

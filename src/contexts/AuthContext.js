@@ -13,31 +13,28 @@ useEffect(() => {
   const auth = getAuth();
   const db   = getFirestore();
 
- const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
   try {
     if (firebaseUser) {
       setUser(firebaseUser);
 
-      // 1. Busca o UID de emergência que está no banco (SEM HARDCODE NO CÓDIGO)
-      // As Rules permitem a leitura se você estiver logado.
       const emergencySnap = await getDoc(doc(db, 'config', 'emergency'));
       const emergencyUid  = emergencySnap.exists() ? emergencySnap.data().uid : null;
 
       if (firebaseUser.uid === emergencyUid) {
         setRole('admin');
       } else {
-        // 2. Usuário normal
         const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
-        setRole(userSnap.exists() ? userSnap.data().role : 'membro');
+        // Se documento não existe ainda (cadastro em andamento) → pendente
+        setRole(userSnap.exists() ? userSnap.data().role : 'pendente');
       }
     } else {
       setUser(null);
       setRole(null);
     }
   } catch (error) {
-    // Se der erro de permissão aqui, o catch segura e te define como membro
-    console.log("Acesso administrativo via DB negado. Logando como membro.");
-    setRole('membro');
+    console.error('Erro no AuthContext:', error);
+    setRole('pendente'); // fallback seguro
   } finally {
     setLoading(false);
   }
