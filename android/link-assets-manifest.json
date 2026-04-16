@@ -1,0 +1,49 @@
+{
+  "migIndex": 1,
+  "data": [
+    {
+      "path": "android/app/src/main/assets/bibles/ACF.sqlite",
+      "sha1": "07b7503df7ce5d0aaeb92dac47e358dc05db7e29"
+    },
+    {
+      "path": "android/app/src/main/assets/bibles/ARA.sqlite",
+      "sha1": "6e5be4050d08e150883276051ec91230d9ba1a1b"
+    },
+    {
+      "path": "android/app/src/main/assets/bibles/ARC.sqlite",
+      "sha1": "5a1c8c295a44bda6056f12da0ee48daa0cdb372a"
+    },
+    {
+      "path": "android/app/src/main/assets/bibles/AS21.sqlite",
+      "sha1": "befc9d550f71ea9928d55b978e59702ad10e8968"
+    },
+    {
+      "path": "android/app/src/main/assets/bibles/KJA.sqlite",
+      "sha1": "bc7b93df399db077f44f78175f0da438614447bf"
+    },
+    {
+      "path": "android/app/src/main/assets/bibles/KJF.sqlite",
+      "sha1": "1571f979acf42315c307d721772af08a1c6e077f"
+    },
+    {
+      "path": "android/app/src/main/assets/bibles/NAA.sqlite",
+      "sha1": "9621859b5a4319d4b362f33c8e57121addbf3a92"
+    },
+    {
+      "path": "android/app/src/main/assets/bibles/NBV.sqlite",
+      "sha1": "84ebcf39bb0f5405d85757087f4b181b87cae6bd"
+    },
+    {
+      "path": "android/app/src/main/assets/bibles/NVI.db",
+      "sha1": "35743c3e037a86481d32ca629bcf5252c32d8ed8"
+    },
+    {
+      "path": "android/app/src/main/assets/bibles/NVT.sqlite",
+      "sha1": "15f03f234349df190cbaa32a0de699916540ba7d"
+    },
+    {
+      "path": "android/app/src/main/assets/bibles/TB.sqlite",
+      "sha1": "63f90007d35bcf0803d51ecde31b3475368b6980"
+    }
+  ]
+}

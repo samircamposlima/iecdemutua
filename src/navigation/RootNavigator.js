@@ -8,6 +8,7 @@ import VisitorDrawer  from './VisitorDrawer';
 import MemberDrawer   from './MemberDrawer';
 import AdminDrawer    from './AdminDrawer';
 import AuthStack     from './AuthStack'; 
+import ReadingScreen from '../screens/ReadingScreen';
 
 
 const RootStack = createNativeStackNavigator();
@@ -26,19 +27,26 @@ export default function RootNavigator() {
   return (
     <NavigationContainer>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
+        
         {!user ? (
           <>
-    <RootStack.Screen name="Auth"      component={AuthStack}   />
-    <RootStack.Screen name="VisitorApp" component={VisitorDrawer} />
-  </>
-) : role === 'admin' ? (
-  <RootStack.Screen name="AdminApp"  component={AdminDrawer}  />
-) : role === 'membro' ? (
-  <RootStack.Screen name="MemberApp" component={MemberDrawer} />
-) : (
-  // role: "pendente" ou qualquer outro → acesso de visitante
-  <RootStack.Screen name="VisitorApp" component={VisitorDrawer} />
+            <RootStack.Screen name="Auth" component={AuthStack} />
+            <RootStack.Screen name="VisitorApp" component={VisitorDrawer} />
+          </>
+        ) : role === 'admin' ? (
+          <RootStack.Screen name="AdminApp" component={AdminDrawer} />
+        ) : role === 'membro' ? (
+          <RootStack.Screen name="MemberApp" component={MemberDrawer} />
+        ) : (
+          <RootStack.Screen name="VisitorApp" component={VisitorDrawer} />
         )}
+
+        {/* 🔥 ESSA É A PARTE IMPORTANTE */}
+        <RootStack.Screen 
+          name="ReadingScreen" 
+          component={ReadingScreen} 
+        />
+
       </RootStack.Navigator>
     </NavigationContainer>
   );

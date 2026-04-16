@@ -1,73 +1,208 @@
-import { open } from '@op-engineering/op-sqlite';
+import { open, moveAssetsDatabase } from '@op-engineering/op-sqlite';
+import { Platform } from 'react-native';
+import RNFS from 'react-native-fs';
 
-// Cache de conexões abertas — evita reabrir o mesmo banco
-const openDatabases = {};
+let db = null;
+let currentVersion = null;
 
 /**
- * Abre (ou reutiliza) a conexão com o banco da versão selecionada.
- * Os arquivos ficam em android/app/src/main/assets/bibles/
+ * 1. Função de Abertura (O Pulo do Gato)
+ * Gerencia a cópia dos assets e a conexão com o SQLite
  */
-function getDb(version) {
-  if (!openDatabases[version]) {
-    openDatabases[version] = open({
-      name: version,           // ex: "nvi.sqlite"
-      location: 'bibles',     // subpasta dentro de assets/
+export const openBible = async (versionFile) => {
+  // Se já está aberto com a mesma versão, retorna o banco atual
+  if (currentVersion === versionFile && db) return db;
+
+  try {
+    // No Android, precisamos garantir que o arquivo saia dos assets e vá para o filesystem
+    if (Platform.OS === 'android') {
+      console.log(`[Database] Preparando: ${versionFile}`);
+      
+      // moveAssetsDatabase já lida com a cópia de forma eficiente
+      await moveAssetsDatabase({
+        filename: versionFile, // Ex: 'NVI.sqlite'
+        path: 'bibles',        // Pasta dentro de android/app/src/main/assets/
+        overwrite: false,      
+      });
+
+      const dbDir = `${RNFS.DocumentDirectoryPath}/../databases`;
+      const stat = await RNFS.stat(`${dbDir}/${versionFile}`);
+      console.log(`[Database] Tamanho de ${versionFile}:`, stat.size);
+    }
+
+    // Fecha conexão anterior antes de abrir uma nova
+    if (db) {
+      try { db.close(); } catch (_) {}
+      db = null;
+    }
+
+    // Abre o banco (o op-sqlite sabe onde encontrar após o moveAssetsDatabase)
+    db = open({ name: versionFile });
+    
+    currentVersion = versionFile;
+    console.log(`[Database] ${versionFile} aberto com sucesso.`);
+    return db;
+
+  } catch (error) {
+    console.error("[Database Erro]", error);
+    throw error;
+  }
+};
+
+/**
+ * 2. Fechamento
+ */
+export function closeBible() {
+  if (db) {
+    try { db.close(); } catch (_) {}
+    db = null;
+    currentVersion = null;
+  }
+}
+
+/**
+ * 3. Consultas (Metadata, Livros, Capítulos e Versículos)
+ */
+export async function getBibleMetadata(versionFile) {
+  try {
+    const database = await openBible(versionFile);
+    const result = database.execute('SELECT key, value FROM metadata');
+    const meta = {};
+    const rows = result?.rows?._array || result?.rows || [];
+    console.log(`[DEBUG] Itens encontrados: ${rows.length}`);
+    rows.forEach(row => {
+      meta[row.key] = row.value;
     });
+    return meta;
+  } catch (e) {
+    console.error('getBibleMetadata:', e.message);
+    return { name: 'Bíblia', version: versionFile };
   }
-  return openDatabases[version];
 }
 
-/** Lista os metadados da versão (nome, copyright) */
-export async function getBibleMetadata(version) {
-  const db = getDb(version);
-  const result = db.execute('SELECT key, value FROM metadata');
-  const meta = {};
-  for (const row of result.rows._array) {
-    meta[row.key] = row.value;
+export async function getBooks(versionFile) {
+  try {
+    const database = await openBible(versionFile);
+    const result = database.execute(
+      'SELECT id, book_reference_id, testament_reference_id, name, short_name FROM book ORDER BY book_reference_id'
+    );
+    return result.rows?._array ?? result.rows ?? [];
+  } catch (e) {
+    console.error('getBooks:', e.message);
+    return [];
   }
-  return meta;
 }
 
-/** Retorna os dois testamentos */
-export async function getTestaments(version) {
-  const db = getDb(version);
-  const result = db.execute('SELECT id, name FROM testament ORDER BY id');
-  return result.rows._array;
-}
-
-/** Retorna todos os 66 livros */
-export async function getBooks(version) {
-  const db = getDb(version);
-  const result = db.execute(
-    'SELECT id, name, short_name, testament_reference_id FROM book ORDER BY id'
-  );
-  return result.rows._array;
-}
-
-/** Retorna a lista de capítulos disponíveis para um livro */
-export async function getChapters(version, bookId) {
-  const db = getDb(version);
-  const result = db.execute(
-    'SELECT DISTINCT chapter FROM verse WHERE book_id = ? ORDER BY chapter',
-    [bookId]
-  );
-  return result.rows._array.map(r => r.chapter);
-}
-
-/** Retorna todos os versículos de um capítulo */
-export async function getVerses(version, bookId, chapter) {
-  const db = getDb(version);
-  const result = db.execute(
-    'SELECT verse, text FROM verse WHERE book_id = ? AND chapter = ? ORDER BY verse',
-    [bookId, chapter]
-  );
-  return result.rows._array;
-}
-
-/** Fecha todas as conexões (chama no unmount se necessário) */
-export function closeAllDatabases() {
-  for (const key of Object.keys(openDatabases)) {
-    openDatabases[key].close();
-    delete openDatabases[key];
+export async function getBooksByTestament(versionFile, testamentId) {
+  try {
+    const database = await openBible(versionFile);
+    const result = database.execute(
+      'SELECT id, book_reference_id, testament_reference_id, name, short_name FROM book WHERE testament_reference_id = ? ORDER BY book_reference_id',
+      [testamentId]
+    );
+    return result.rows?._array ?? result.rows ?? [];
+  } catch (e) {
+    console.error('getBooksByTestament:', e.message);
+    return [];
   }
+}
+
+export async function getBookById(versionFile, bookId) {
+  try {
+    const database = await openBible(versionFile);
+    const result = database.execute(
+      'SELECT id, book_reference_id, testament_reference_id, name, short_name FROM book WHERE id = ?',
+      [bookId]
+    );
+    const rows = result?.rows?._array || result?.rows || [];
+    console.log(`[DEBUG] Itens encontrados: ${rows.length}`);
+    return rows[0] ?? null;
+  } catch (e) {
+    console.error('getBookById:', e.message);
+    return null;
+  }
+}
+
+export async function getMaxChapter(versionFile, bookId) {
+  try {
+    const database = await openBible(versionFile);
+    const result = database.execute(
+      'SELECT MAX(chapter) as total FROM verse WHERE book_id = ?',
+      [bookId]
+    );
+    const rows = result?.rows?._array || result?.rows || [];
+    console.log(`[DEBUG] Itens encontrados: ${rows.length}`);
+    return rows[0]?.total ?? 1;
+  } catch (e) {
+    console.error('getMaxChapter:', e.message);
+    return 1;
+  }
+}
+
+export async function getChapters(versionFile, bookId) {
+  const total = await getMaxChapter(versionFile, bookId);
+  return Array.from({ length: total }, (_, i) => i + 1);
+}
+
+export async function getVerses(versionFile, bookId, chapter) {
+  try {
+    const database = await openBible(versionFile);
+    const result = database.execute(
+      'SELECT id, verse, text FROM verse WHERE book_id = ? AND chapter = ? ORDER BY verse',
+      [bookId, chapter]
+    );
+    return result.rows?._array ?? result.rows ?? [];
+  } catch (e) {
+    console.error('getVerses:', e.message);
+    return [];
+  }
+}
+
+/**
+ * 4. Navegação
+ */
+export async function getPreviousChapter(versionFile, bookId, currentChapter) {
+  if (currentChapter > 1) {
+    const book = await getBookById(versionFile, bookId);
+    return book
+      ? { bookId, bookName: book.name, shortName: book.short_name, chapter: currentChapter - 1 }
+      : null;
+  }
+
+  const allBooks = await getBooks(versionFile);
+  const currentIndex = allBooks.findIndex(b => b.id === bookId);
+  if (currentIndex <= 0) return null;
+
+  const prevBook = allBooks[currentIndex - 1];
+  const lastChapter = await getMaxChapter(versionFile, prevBook.id);
+
+  return {
+    bookId: prevBook.id,
+    bookName: prevBook.name,
+    shortName: prevBook.short_name,
+    chapter: lastChapter,
+  };
+}
+
+export async function getNextChapter(versionFile, bookId, currentChapter) {
+  const maxChapter = await getMaxChapter(versionFile, bookId);
+
+  if (currentChapter < maxChapter) {
+    const book = await getBookById(versionFile, bookId);
+    return book
+      ? { bookId, bookName: book.name, shortName: book.short_name, chapter: currentChapter + 1 }
+      : null;
+  }
+
+  const allBooks = await getBooks(versionFile);
+  const currentIndex = allBooks.findIndex(b => b.id === bookId);
+  if (currentIndex < 0 || currentIndex >= allBooks.length - 1) return null;
+
+  const nextBook = allBooks[currentIndex + 1];
+  return {
+    bookId: nextBook.id,
+    bookName: nextBook.name,
+    shortName: nextBook.short_name,
+    chapter: 1,
+  };
 }

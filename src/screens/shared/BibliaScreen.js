@@ -1,258 +1,346 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+/**
+ * BibliaScreen.js — atualizado para BibleService assíncrono
+ * Picker de versão sempre visível + livros → capítulos → versículos
+ */
+
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity,
-  ActivityIndicator, StyleSheet, StatusBar,
-  Platform, BackHandler, TextInput,
+  StyleSheet, StatusBar, Platform,
+  ActivityIndicator, BackHandler,
 } from 'react-native';
-import { useAppTheme } from '../../themes'; // ajusta o caminho se necessário
+import { Picker } from '@react-native-picker/picker';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useAppTheme } from '../../themes';
 import {
-  getBooks, getChapters, getVerses, getBibleMetadata,
-} from '../../services/BibleService';
-import VersionSelector, { BIBLE_VERSIONS } from '../../components/bible/VersionSelector';
+  useBible,
+  //BIBLE_VERSIONS,
+  TESTAMENT_FILTER,
+} from '../../hooks/useBible';
+import { getVerses } from '../../services/BibleService';
+import { BIBLE_VERSIONS } from '../../constants/Bibles';
 
-// Navegação interna: qual "tela" está ativa
-const VIEW = { VERSION: 'version', BOOK: 'book', CHAPTER: 'chapter', READING: 'reading' };
+const VIEW = { BOOKS: 'books', CHAPTERS: 'chapters', VERSES: 'verses' };
 
 export default function BibliaScreen() {
-const theme = useAppTheme();
-  const s = makeStyles(theme);
+  const theme      = useAppTheme();
+  const s          = makeStyles(theme);
+  const navigation = useNavigation();
 
-  // Estado de navegação
-  const [view, setView]               = useState(VIEW.VERSION);
-  const [version, setVersion]         = useState(null);
-  const [versionMeta, setVersionMeta] = useState({});
-  const [books, setBooks]             = useState([]);
-  const [selectedBook, setSelectedBook] = useState(null);
-  const [chapters, setChapters]       = useState([]);
+  const {
+    version, selectVersion, metadata,
+    books, loadingBooks, testamentFilter, setTestamentFilter,
+    selectedBook, selectBook, chapters, loadingChapters,
+    lastPosition, clearPosition,
+  } = useBible();
+
+  const [view, setView]                       = useState(VIEW.BOOKS);
   const [selectedChapter, setSelectedChapter] = useState(null);
-  const [verses, setVerses]           = useState([]);
-  const [loading, setLoading]         = useState(false);
+  const [verses, setVerses]                   = useState([]);
+  const [loadingVerses, setLoadingVerses]     = useState(false);
 
-  // Busca de versículos
-  const [search, setSearch]           = useState('');
+  // ─── Botão físico de voltar ───────────────────────────────────────────────
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (view === VIEW.VERSES)   { setView(VIEW.CHAPTERS); return true; }
+        if (view === VIEW.CHAPTERS) { setView(VIEW.BOOKS);    return true; }
+        return false;
+      });
+      return () => sub.remove();
+    }, [view])
+  );
 
-  // Botão voltar do Android
-  useEffect(() => {
-    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (view === VIEW.READING)  { setView(VIEW.CHAPTER);  return true; }
-      if (view === VIEW.CHAPTER)  { setView(VIEW.BOOK);     return true; }
-      if (view === VIEW.BOOK)     { setView(VIEW.VERSION);  return true; }
-      return false; // deixa o drawer/navigator tratar
-    });
-    return () => handler.remove();
-  }, [view]);
-
-  // ── Handlers de seleção ─────────────────────────────────────────────────
-
-  const handleSelectVersion = useCallback(async (versionId) => {
-    setLoading(true);
-    setVersion(versionId);
-    try {
-      const [meta, bookList] = await Promise.all([
-        getBibleMetadata(versionId),
-        getBooks(versionId),
-      ]);
-      setVersionMeta(meta);
-      setBooks(bookList);
-      setView(VIEW.BOOK);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const handleSelectBook = useCallback(async (book) => {
-    setLoading(true);
-    setSelectedBook(book);
-    try {
-      const chapterList = await getChapters(version, book.id);
-      setChapters(chapterList);
-      setView(VIEW.CHAPTER);
-    } finally {
-      setLoading(false);
-    }
-  }, [version]);
-
+  // ─── Selecionar capítulo → carrega versículos ─────────────────────────────
   const handleSelectChapter = useCallback(async (chapter) => {
-    setLoading(true);
     setSelectedChapter(chapter);
-    setSearch('');
+    setLoadingVerses(true);
     try {
-      const verseList = await getVerses(version, selectedBook.id, chapter);
-      setVerses(verseList);
-      setView(VIEW.READING);
+      const vss = await getVerses(version.file, selectedBook.id, chapter);
+      setVerses(vss);
+      setView(VIEW.VERSES);
+    } catch (e) {
+      console.error('handleSelectChapter:', e);
     } finally {
-      setLoading(false);
+      setLoadingVerses(false);
     }
   }, [version, selectedBook]);
 
-  // ── Cabeçalho de navegação ───────────────────────────────────────────────
+  // ─── Toca versículo → navega para ReadingScreen ───────────────────────────
+  const handleSelectVerse = useCallback((verse) => {
+    navigation.navigate('ReadingScreen', {
+      versionFile: version.file,
+      versionId:   version.id,
+      bookId:      selectedBook.id,
+      bookName:    selectedBook.name,
+      shortName:   selectedBook.short_name,
+      chapter:     selectedChapter,
+      verse:       verse.verse,
+    });
+  }, [version, selectedBook, selectedChapter, navigation]);
 
-  const renderHeader = () => {
-    const crumbs = [];
-    if (version) {
-      const vLabel = BIBLE_VERSIONS.find(v => v.id === version)?.label ?? version;
-      crumbs.push({ label: vLabel.split('—')[0].trim(), onPress: () => setView(VIEW.VERSION) });
-    }
-    if (selectedBook && view !== VIEW.BOOK) {
-      crumbs.push({ label: selectedBook.short_name, onPress: () => setView(VIEW.BOOK) });
-    }
-    if (selectedChapter && view === VIEW.READING) {
-      crumbs.push({ label: `Cap. ${selectedChapter}`, onPress: () => setView(VIEW.CHAPTER) });
-    }
+  // ─── Continuar leitura ────────────────────────────────────────────────────
+  const handleContinueReading = useCallback(() => {
+    if (!lastPosition || !version) return;
+    navigation.navigate('ReadingScreen', {
+      versionFile: version.file,
+      versionId:   version.id,
+      bookId:      lastPosition.bookId,
+      bookName:    lastPosition.bookName,
+      shortName:   lastPosition.shortName,
+      chapter:     lastPosition.chapter,
+      verse:       lastPosition.verse,
+    });
+  }, [lastPosition, version, navigation]);
 
+  function handleSelectBook(book) {
+    selectBook(book);
+    setView(VIEW.CHAPTERS);
+  }
+
+  function goBack() {
+    if (view === VIEW.VERSES)   { setView(VIEW.CHAPTERS); return; }
+    if (view === VIEW.CHAPTERS) { setView(VIEW.BOOKS);    return; }
+  }
+
+  function getHeaderTitle() {
+    if (view === VIEW.CHAPTERS) return selectedBook?.name ?? '';
+    if (view === VIEW.VERSES)   return `${selectedBook?.short_name} ${selectedChapter}`;
+    return metadata?.name ?? version?.label ?? 'Bíblia';
+  }
+
+  // ─── Picker de versão ─────────────────────────────────────────────────────
+  function renderVersionPicker() {
     return (
-      <View style={s.header}>
-        <Text style={s.headerTitle}>
-          {view === VIEW.VERSION && 'Bíblia Sagrada'}
-          {view === VIEW.BOOK    && 'Escolha o Livro'}
-          {view === VIEW.CHAPTER && `${selectedBook?.name} — Capítulos`}
-          {view === VIEW.READING && `${selectedBook?.short_name} ${selectedChapter}`}
-        </Text>
-        {crumbs.length > 0 && (
-          <View style={s.breadcrumbs}>
-            {crumbs.map((c, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && <Text style={s.breadSep}>›</Text>}
-                <TouchableOpacity onPress={c.onPress}>
-                  <Text style={s.breadItem}>{c.label}</Text>
-                </TouchableOpacity>
-              </React.Fragment>
-            ))}
-          </View>
-        )}
+      <View style={s.pickerWrapper}>
+        <Picker
+          selectedValue={version?.id ?? 'NVI'}
+          onValueChange={(val) => {
+            const found = BIBLE_VERSIONS.find(v => v.id === val);
+            if (found) selectVersion(found);
+          }}
+          style={s.picker}
+          dropdownIconColor={theme.primary}
+          mode="dropdown"
+        >
+          {BIBLE_VERSIONS.map(v => (
+            <Picker.Item
+              key={v.id}
+              label={`${v.id} — ${v.label}`}
+              value={v.id}
+              color={theme.text}
+              style={{ backgroundColor: theme.surface }}
+            />
+          ))}
+        </Picker>
       </View>
     );
-  };
+  }
 
-  // ── Render das views ─────────────────────────────────────────────────────
-
-  const renderVersionView = () => (
-    <VersionSelector
-      selectedVersion={version}
-      onSelect={handleSelectVersion}
-      theme={theme}
-    />
-  );
-
-  const renderBookView = () => (
-    <FlatList
-      data={books}
-      keyExtractor={b => String(b.id)}
-      renderItem={({ item }) => (
-        <TouchableOpacity
-          style={[s.listItem, { borderBottomColor: theme.border }]}
-          onPress={() => handleSelectBook(item)}
-        >
-          <Text style={[s.listItemText, { color: theme.text }]}>{item.name}</Text>
-          <Text style={[s.listItemSub, { color: theme.textSecondary }]}>{item.short_name}</Text>
-        </TouchableOpacity>
-      )}
-    />
-  );
-
-  const renderChapterView = () => (
-    <FlatList
-      data={chapters}
-      keyExtractor={c => String(c)}
-      numColumns={5}
-      contentContainerStyle={s.chapterGrid}
-      renderItem={({ item }) => (
-        <TouchableOpacity
-          style={[s.chapterBtn, { borderColor: theme.primary }]}
-          onPress={() => handleSelectChapter(item)}
-        >
-          <Text style={[s.chapterNum, { color: theme.primary }]}>{item}</Text>
-        </TouchableOpacity>
-      )}
-    />
-  );
-
-  const filteredVerses = search.trim()
-    ? verses.filter(v => v.text.toLowerCase().includes(search.toLowerCase()))
-    : verses;
-
-  const renderReadingView = () => (
-    <>
-      <View style={[s.searchBar, { backgroundColor: theme.surface }]}>
-        <TextInput
-          style={[s.searchInput, { color: theme.text }]}
-          placeholder="Buscar neste capítulo..."
-          placeholderTextColor={theme.textSecondary}
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Text style={{ color: theme.textSecondary, fontSize: 18, paddingHorizontal: 8 }}>✕</Text>
+  // ─── Filtro AT / NT / Todos ───────────────────────────────────────────────
+  function renderTestamentFilter() {
+    const filters = [
+      { key: TESTAMENT_FILTER.ALL, label: 'Todos' },
+      { key: TESTAMENT_FILTER.OLD, label: 'AT' },
+      { key: TESTAMENT_FILTER.NEW, label: 'NT' },
+    ];
+    return (
+      <View style={s.filterRow}>
+        {filters.map(f => (
+          <TouchableOpacity
+            key={f.key}
+            style={[s.filterBtn, testamentFilter === f.key && s.filterBtnActive]}
+            onPress={() => setTestamentFilter(f.key)}
+          >
+            <Text style={[s.filterLabel, testamentFilter === f.key && s.filterLabelActive]}>
+              {f.label}
+            </Text>
           </TouchableOpacity>
-        )}
+        ))}
       </View>
-      <FlatList
-        data={filteredVerses}
-        keyExtractor={v => String(v.verse)}
-        contentContainerStyle={s.verseList}
-        renderItem={({ item }) => (
-          <View style={s.verseRow}>
-            <Text style={[s.verseNum, { color: theme.primary }]}>{item.verse}</Text>
-            <Text style={[s.verseText, { color: theme.text }]}>{item.text}</Text>
-          </View>
-        )}
-      />
-    </>
-  );
+    );
+  }
 
-  // ── Render principal ─────────────────────────────────────────────────────
+  // ─── Banner continuar leitura ─────────────────────────────────────────────
+  function renderContinueBanner() {
+    if (!lastPosition || view !== VIEW.BOOKS) return null;
+    return (
+      <TouchableOpacity style={s.continueBanner} onPress={handleContinueReading}>
+        <Text style={s.continueText}>
+          📖 Continuar: {lastPosition.shortName} {lastPosition.chapter}
+          {lastPosition.verse > 0 ? `:${lastPosition.verse}` : ''}
+        </Text>
+        <TouchableOpacity onPress={clearPosition} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={s.continueClear}>✕</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  }
+
+  // ─── Conteúdo principal ───────────────────────────────────────────────────
+  function renderContent() {
+    if (loadingBooks || loadingChapters || loadingVerses || !version) {
+      return (
+        <View style={s.center}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      );
+    }
+
+    if (view === VIEW.BOOKS) {
+      return (
+        <FlatList
+          data={books}
+          keyExtractor={item => String(item.id)}
+          numColumns={3}
+          contentContainerStyle={s.gridPad}
+          columnWrapperStyle={s.columnGap}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={s.bookCard}
+              onPress={() => handleSelectBook(item)}
+              activeOpacity={0.75}
+            >
+              <Text style={s.bookShort}>{item.short_name}</Text>
+              <Text style={s.bookName} numberOfLines={2}>{item.name}</Text>
+            </TouchableOpacity>
+          )}
+        />
+      );
+    }
+
+    if (view === VIEW.CHAPTERS) {
+      return (
+        <FlatList
+          data={chapters}
+          keyExtractor={item => String(item)}
+          numColumns={3}
+          contentContainerStyle={s.gridPad}
+          columnWrapperStyle={s.columnGap}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={s.chapterCard}
+              onPress={() => handleSelectChapter(item)}
+              activeOpacity={0.75}
+            >
+              <Text style={s.chapterNum}>{item}</Text>
+            </TouchableOpacity>
+          )}
+        />
+      );
+    }
+
+    if (view === VIEW.VERSES) {
+      return (
+        <FlatList
+          data={verses}
+          keyExtractor={item => String(item.verse)}
+          numColumns={3}
+          contentContainerStyle={s.gridPad}
+          columnWrapperStyle={s.columnGap}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={s.verseNumCard}
+              onPress={() => handleSelectVerse(item)}
+              activeOpacity={0.75}
+            >
+              <Text style={s.verseNumText}>{item.verse}</Text>
+            </TouchableOpacity>
+          )}
+        />
+      );
+    }
+
+    return null;
+  }
 
   return (
-    <View style={[s.container, { backgroundColor: theme.background }]}>
-      <StatusBar
-        barStyle={theme.dark ? 'light-content' : 'dark-content'}
-        backgroundColor={theme.background}
-      />
-      {renderHeader()}
-      {loading
-        ? <ActivityIndicator size="large" color={theme.primary} style={s.loader} />
-        : (
-          <>
-            {view === VIEW.VERSION && renderVersionView()}
-            {view === VIEW.BOOK    && renderBookView()}
-            {view === VIEW.CHAPTER && renderChapterView()}
-            {view === VIEW.READING && renderReadingView()}
-          </>
-        )
-      }
+    <View style={s.container}>
+      <StatusBar backgroundColor={theme.headerBackground} barStyle="light-content" />
+
+      <View style={s.header}>
+        {view !== VIEW.BOOKS ? (
+          <TouchableOpacity onPress={goBack} style={s.backBtn}>
+            <Text style={s.backIcon}>←</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={s.backBtn} />
+        )}
+        <Text style={s.headerTitle} numberOfLines={1}>{getHeaderTitle()}</Text>
+      </View>
+
+      {renderVersionPicker()}
+      {view === VIEW.BOOKS && renderTestamentFilter()}
+      {renderContinueBanner()}
+      {renderContent()}
     </View>
   );
 }
 
 function makeStyles(theme) {
   return StyleSheet.create({
-    container:    { flex: 1 },
-    loader:       { flex: 1, justifyContent: 'center' },
-
-    // Header
-    header:       { paddingTop: Platform.OS === 'android' ? 12 : 48, paddingHorizontal: 16, paddingBottom: 12, backgroundColor: theme.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border },
-    headerTitle:  { fontSize: 20, fontWeight: '700', color: theme.text },
-    breadcrumbs:  { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-    breadItem:    { fontSize: 13, color: theme.primary },
-    breadSep:     { fontSize: 13, color: theme.textSecondary, marginHorizontal: 4 },
-
-    // Listas
-    listItem:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth },
-    listItemText: { fontSize: 16 },
-    listItemSub:  { fontSize: 13 },
-
-    // Grid de capítulos
-    chapterGrid:  { padding: 12 },
-    chapterBtn:   { flex: 1, margin: 6, aspectRatio: 1, borderWidth: 1, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-    chapterNum:   { fontSize: 16, fontWeight: '600' },
-
-    // Leitura
-    searchBar:    { flexDirection: 'row', alignItems: 'center', marginHorizontal: 12, marginVertical: 8, borderRadius: 8, paddingHorizontal: 12 },
-    searchInput:  { flex: 1, height: 40, fontSize: 15 },
-    verseList:    { paddingHorizontal: 16, paddingBottom: 32 },
-    verseRow:     { flexDirection: 'row', paddingVertical: 8 },
-    verseNum:     { width: 32, fontSize: 12, fontWeight: '700', paddingTop: 3 },
-    verseText:    { flex: 1, fontSize: 16, lineHeight: 26 },
+    container: { flex: 1, backgroundColor: theme.background },
+    header: {
+      flexDirection:     'row',
+      alignItems:        'center',
+      backgroundColor:   theme.headerBackground,
+      paddingTop:        Platform.OS === 'android' ? StatusBar.currentHeight : 44,
+      paddingHorizontal: 12,
+      paddingBottom:     12,
+      gap: 8,
+    },
+    backBtn:     { width: 32, alignItems: 'flex-start' },
+    backIcon:    { color: theme.primary, fontSize: 22, fontWeight: 'bold' },
+    headerTitle: { flex: 1, color: theme.headerText, fontSize: 18, fontWeight: '600' },
+    pickerWrapper: {
+      backgroundColor:   theme.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.border,
+    },
+    picker: { color: theme.text, backgroundColor: theme.surface },
+    filterRow: {
+      flexDirection:     'row',
+      paddingHorizontal: 12,
+      paddingVertical:   8,
+      gap: 8,
+    },
+    filterBtn: {
+      flex: 1, paddingVertical: 8, borderRadius: 8,
+      borderWidth: 1, borderColor: theme.border,
+      alignItems: 'center', backgroundColor: theme.surface,
+    },
+    filterBtnActive:   { backgroundColor: theme.primary, borderColor: theme.primary },
+    filterLabel:       { color: theme.textSecondary, fontWeight: '600', fontSize: 13 },
+    filterLabelActive: { color: theme.textOnGold },
+    continueBanner: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      marginHorizontal: 12, marginBottom: 8, padding: 12,
+      borderRadius: 10, backgroundColor: theme.surfaceVariant,
+      borderLeftWidth: 3, borderLeftColor: theme.primary,
+    },
+    continueText:  { color: theme.text, fontSize: 13, flex: 1 },
+    continueClear: { color: theme.textSecondary, fontSize: 16, paddingLeft: 8 },
+    center:        { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    gridPad:       { padding: 8 },
+    columnGap:     { gap: 8 },
+    bookCard: {
+      flex: 1, backgroundColor: theme.surface, borderRadius: 10,
+      borderWidth: 1, borderColor: theme.border, padding: 10,
+      marginBottom: 8, alignItems: 'center', minHeight: 64, justifyContent: 'center',
+    },
+    bookShort:    { color: theme.primary, fontWeight: '700', fontSize: 14, marginBottom: 2 },
+    bookName:     { color: theme.textSecondary, fontSize: 10, textAlign: 'center' },
+    chapterCard: {
+      flex: 1, aspectRatio: 1, backgroundColor: theme.surface,
+      borderRadius: 8, borderWidth: 1, borderColor: theme.border,
+      justifyContent: 'center', alignItems: 'center', marginBottom: 8,
+    },
+    chapterNum:   { color: theme.text, fontSize: 16, fontWeight: '600' },
+    verseNumCard: {
+      flex: 1, aspectRatio: 1, backgroundColor: theme.surface,
+      borderRadius: 8, borderWidth: 1, borderColor: theme.border,
+      justifyContent: 'center', alignItems: 'center', marginBottom: 8,
+    },
+    verseNumText: { color: theme.primary, fontSize: 15, fontWeight: '700' },
   });
 }

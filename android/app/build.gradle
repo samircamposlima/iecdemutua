@@ -78,12 +78,10 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    sourceSets {
-        main {
-            assets.srcDirs = ['src/main/assets']
-        }
+          aaptOptions {
+                noCompress 'sqlite', 'db', 'db.sqlite'
     }
-
+    
     namespace "com.iecdemutua"
     defaultConfig {
         applicationId "com.iecdemutua"
@@ -96,7 +94,20 @@ android {
                 arguments "-DANDROID_STL=c++_shared"
             }
         }
+  
+
     }
+
+
+  
+
+     packagingOptions {
+        pickFirst 'lib/x86/libc++_shared.so'
+        pickFirst 'lib/x86_64/libc++_shared.so'
+        pickFirst 'lib/arm64-v8a/libc++_shared.so'
+        pickFirst 'lib/armeabi-v7a/libc++_shared.so'
+    }
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
