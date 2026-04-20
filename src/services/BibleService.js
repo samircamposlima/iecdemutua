@@ -20,7 +20,7 @@ export const openBible = async (versionFile) => {
       
       // moveAssetsDatabase já lida com a cópia de forma eficiente
       await moveAssetsDatabase({
-        filename: versionFile, // Ex: 'NVI.sqlite'
+        filename: versionFile, // Ex: 'NVI.db'
         path: 'bibles',        // Pasta dentro de android/app/src/main/assets/
         overwrite: false,      
       });
@@ -37,7 +37,9 @@ export const openBible = async (versionFile) => {
     }
 
     // Abre o banco (o op-sqlite sabe onde encontrar após o moveAssetsDatabase)
-    db = open({ name: versionFile });
+    db = open({ name: versionFile,
+                assetFilename: `bibles/${selectedVersion.file}`
+     });
     
     currentVersion = versionFile;
     console.log(`[Database] ${versionFile} aberto com sucesso.`);

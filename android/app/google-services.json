@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "407396195887",
+    "project_id": "iec-de-mutua",
+    "storage_bucket": "iec-de-mutua.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:407396195887:android:d256e22bb10c579744b0da",
+        "android_client_info": {
+          "package_name": "com.iecdemutua"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA4j48xsBWwmojY9tM3Qdo16Ehd3knC4BE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:407396195887:android:283456fe689ccdda44b0da",
+        "android_client_info": {
+          "package_name": "com.yahwehproject.iecdemutu"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA4j48xsBWwmojY9tM3Qdo16Ehd3knC4BE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

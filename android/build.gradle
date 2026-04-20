@@ -1,23 +1,52 @@
 buildscript {
     ext {
-        buildToolsVersion = "34.0.0"
-        minSdkVersion = 24
+        // Reduzido para 34 para manter compatibilidade com React Native 0.74
+        buildToolsVersion = "34.0.0" 
+        minSdkVersion = 23
         compileSdkVersion = 34
         targetSdkVersion = 34
         ndkVersion = "26.1.10909125"
-        kotlinVersion = "2.0.21"
-    
+        kotlinVersion = "1.9.22"
     }
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-      classpath("com.android.tools.build:gradle:8.7.3")
+        classpath("com.android.tools.build:gradle:8.6.0")
         classpath("com.facebook.react:react-native-gradle-plugin")
-         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
-         classpath("com.google.gms:google-services:4.4.2")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        classpath("com.google.gms:google-services:4.4.1")
     }
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+allprojects {
+    repositories {
+        maven {
+            url("$rootDir/../node_modules/react-native/android")
+        }
+        mavenCentral()
+        google()
+    }
+
+    // ESTE BLOCO É A CHAVE PARA RESOLVER O ERRO DO GESTURE HANDLER
+    configurations.all {
+        resolutionStrategy {
+            // Força o motor do React Native na versão que você instalou via NPM
+            force "com.facebook.react:react-android:0.74.5"
+            force "com.facebook.react:hermes-android:0.74.5"
+            
+            // Força o AndroidX estável, impedindo que o SDK 35 puxe versões instáveis
+            force "androidx.core:core:1.13.1"
+            force "androidx.core:core-ktx:1.13.1"
+
+            eachDependency { details ->
+                if (details.requested.group == 'com.facebook.react') {
+                    details.useVersion '0.74.5'
+                }
+            }
+        }
+    }
+}
