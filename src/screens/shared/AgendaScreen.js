@@ -6,17 +6,18 @@
 //   - Adicionado modal de detalhe ao tocar no card
 //   - Adicionado estado vazio e pull-to-refresh
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, } from 'react';
 import {
   View, Text, FlatList, ActivityIndicator, StyleSheet,
   TouchableOpacity, Modal, ScrollView, RefreshControl,
 } from 'react-native';
 import {
   getFirestore, collection, query,
-  where, orderBy, onSnapshot,
+  where, orderBy, onSnapshot
 } from '@react-native-firebase/firestore';
 import { useAppTheme } from '../../themes';
 import { useAuth }     from '../../contexts/AuthContext';
+import notifee,{TriggerType, AndroidImportance} from '@notifee/react-native';
 
 export default function AgendaScreen() {
   const theme           = useAppTheme();
@@ -27,6 +28,42 @@ export default function AgendaScreen() {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [detalhe,    setDetalhe]    = useState(null);
+
+// ─── teste botão ──────────────────────────────────────────────
+ const dispararAgora = async () => {
+  // 1. Notificação Imediata (O que você já fez)
+  await notifee.displayNotification({
+    title: 'Teste Imediato 🚀',
+    body: 'O sistema de notificações está respondendo!',
+    android: {
+      channelId: 'eventos_lembretes',
+      importance: 4,
+      pressAction: { id: 'default' },
+    },
+  });
+
+  // 2. Teste de Agendamento (Para daqui a 10 segundos)
+  // Isso valida se o seu celular permite "Triggers" (alarmes exatos)
+  const date = new Date(Date.now() + 10000); // 10 segundos no futuro
+
+ const trigger = {
+  type: TriggerType.TIMESTAMP,
+  timestamp: date.getTime(),
+};
+
+  await notifee.createTriggerNotification(
+    {
+      title: 'Lembrete Agendado ⏰',
+      body: 'Este alerta foi programado há 10 segundos atrás.',
+      android: {
+        channelId: 'eventos_lembretes',
+      },
+    },
+    trigger,
+  );
+
+  alert('Notificação imediata enviada e agendamento para daqui a 10s criado!');
+};
 
   // ─── Listener em tempo real ──────────────────────────────────────────────
 
@@ -192,7 +229,14 @@ export default function AgendaScreen() {
       {detalhe && (
         <EventoModal evento={detalhe} theme={theme} onClose={() => setDetalhe(null)} />
       )}
+
+      <TouchableOpacity style={[s.fecharBtn, { backgroundColor: theme.surfaceVariant, borderColor: theme.border }]}
+      onPress={dispararAgora}>
+
+        <Text style={[s.fecharBtnText, { color: theme.text }]}>Notificaçao teste</Text>
+      </TouchableOpacity>
     </View>
+    
   );
 }
 
