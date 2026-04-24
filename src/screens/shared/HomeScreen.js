@@ -34,10 +34,10 @@ export default function HomeScreen() {
         const db = getFirestore();
 
         const themeSnap = await getDoc(doc(db, 'config', 'themeOfYear'));
-        if (themeSnap.exists()) setThemeOfYear(themeSnap.data());
+        if (themeSnap?.exists) setThemeOfYear(themeSnap.data());
 
         const verseSnap = await getDoc(doc(db, 'config', 'verseOfDay'));
-        if (verseSnap.exists()) setVerseOfDay(verseSnap.data());
+        if (verseSnap?.exists) setVerseOfDay(verseSnap.data());
 
         const eventsRef   = collection(db, 'events');
         const now         = new Date();
@@ -147,7 +147,7 @@ export default function HomeScreen() {
       {/* ── Acesso Rápido ── */}
       <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>⚡ ACESSO RÁPIDO</Text>
       <View style={styles.quickGrid}>
-        <QuickButton label="Bíblia"  emoji="📖" onPress={() => navigation.navigate('Bíblia')}           theme={theme} />
+        <QuickButton label="Bíblia"  emoji="📖" onPress={() => navigation.navigate('Biblia')}           theme={theme} />
         <QuickButton label="Oração"  emoji="🙏" onPress={() => navigation.navigate('Pedido de Oração')} theme={theme} />
         <QuickButton label="Pix"     emoji="💛" onPress={() => navigation.navigate('Doação / Pix')}     theme={theme} />
         {isMember && (

@@ -18,7 +18,7 @@ import {
   TESTAMENT_FILTER,
 } from '../../hooks/useBible';
 import { getVerses } from '../../services/BibleService';
-import { BIBLE_VERSIONS } from '../../constants/Bibles';
+import { BIBLE_VERSIONS } from '../../utils/constants/Bibles';
 
 const VIEW = { BOOKS: 'books', CHAPTERS: 'chapters', VERSES: 'verses' };
 

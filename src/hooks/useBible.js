@@ -16,7 +16,7 @@ import {
   saveReadingPosition,
   clearReadingPosition,
 } from '../services/BibleStorage';
-import { BIBLE_VERSIONS } from '../constants/Bibles';
+import { BIBLE_VERSIONS } from '../utils/constants/Bibles';
 
 export const TESTAMENT_FILTER = { ALL: 'all', OLD: 'old', NEW: 'new' };
 

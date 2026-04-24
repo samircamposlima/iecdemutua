@@ -11,34 +11,40 @@ export function AuthProvider({ children }) {
 
 useEffect(() => {
   const auth = getAuth();
-  const db   = getFirestore();
+  const db = getFirestore();
 
-const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-  try {
-    if (firebaseUser) {
+  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    // 1. Se não há usuário, limpa tudo imediatamente e para o loading
+    if (!firebaseUser) {
+      setUser(null);
+      setRole(null);
+      setLoading(false);
+      return;
+    }
+
+    // 2. Se há usuário, buscamos o role ANTES de desligar o loading
+    try {
       setUser(firebaseUser);
 
+      // Busca UID de emergência
       const emergencySnap = await getDoc(doc(db, 'config', 'emergency'));
-      const emergencyUid  = emergencySnap.exists() ? emergencySnap.data().uid : null;
+      const emergencyUid = emergencySnap.exists ? emergencySnap.data().uid : null;
 
       if (firebaseUser.uid === emergencyUid) {
         setRole('admin');
       } else {
         const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
-        // Se documento não existe ainda (cadastro em andamento) → pendente
-        setRole(userSnap.exists() ? userSnap.data().role : 'pendente');
+        const userRole = userSnap.exists ? userSnap.data().role : 'pendente';
+        setRole(userRole);
       }
-    } else {
-      setUser(null);
-      setRole(null);
+    } catch (error) {
+      console.error('Erro ao buscar role:', error);
+      setRole('visitante'); // Fallback para não travar o app
+    } finally {
+      // 3. SÓ DESLIGA O LOADING após ter o user E o role definidos
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Erro no AuthContext:', error);
-    setRole('pendente'); // fallback seguro
-  } finally {
-    setLoading(false);
-  }
-});
+  });
 
   return unsubscribe;
 }, []);

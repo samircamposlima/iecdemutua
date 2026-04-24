@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
 import { useAppTheme } from '../../themes';
-import { BIBLE_VERSIONS } from '../../constants/Bibles';
+import { BIBLE_VERSIONS } from '../../utils/constants/Bibles';
 
 
 export default function VersionSelector({ currentVersion, onSelect }) {
