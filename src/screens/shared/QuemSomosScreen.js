@@ -1,35 +1,41 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Image, ScrollView, ActivityIndicator, StyleSheet, Linking, TouchableOpacity } from 'react-native';
-import firestore from '@react-native-firebase/firestore';
+// Atualizado para API Modular conforme padrão do projeto
+import { getFirestore, collection, query, orderBy, onSnapshot } from '@react-native-firebase/firestore';
 import { useAppTheme } from '../../themes';
-// Importando as constantes do seu novo caminho
+import { useAuth } from '../../contexts/AuthContext';
 import { CHURCH_DATA } from '../../utils/constants/QuemSomos';
 
 export default function QuemSomosScreen() {
   const theme = useAppTheme();
+  const { role } = useAuth(); // Acesso ao nível de acesso do usuário
   const [pastores, setPastores] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // IMPORTANTE: O nome do campo aqui deve ser IGUAL ao do Índice no Firebase
-    const unsubscribe = firestore()
-      .collection('pastores')
-      .orderBy('ordem', 'asc') 
-      .onSnapshot(querySnapshot => {
-        if (!querySnapshot) return;
-        const list = [];
-        querySnapshot.forEach(doc => {
-          list.push({ id: doc.id, ...doc.data() });
-        });
-        setPastores(list);
-        setLoading(false);
-      }, error => {
-        console.error("Erro ao carregar pastores:", error);
-        setLoading(false);
+    // REGRA DE ACESSO: Se for visitante (null/undefined), não inicia o listener
+    if (role !== 'membro' && role !== 'admin') {
+      setLoading(false);
+      return;
+    }
+
+    const db = getFirestore();
+    const q = query(collection(db, 'pastores'), orderBy('ordem', 'asc'));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const list = [];
+      querySnapshot.forEach(doc => {
+        list.push({ id: doc.id, ...doc.data() });
       });
+      setPastores(list);
+      setLoading(false);
+    }, error => {
+      console.error("Erro ao carregar pastores:", error);
+      setLoading(false);
+    });
 
     return () => unsubscribe();
-  }, []);
+  }, [role]);
 
   const Section = ({ title, body }) => (
     <View style={styles.sectionMargin}>
@@ -52,11 +58,10 @@ export default function QuemSomosScreen() {
 
       {loading ? (
         <ActivityIndicator color={theme.primary} size="large" />
-      ) : (
+      ) : (role === 'membro' || role === 'admin') ? (
         pastores.map(pastor => (
           <View key={pastor.id} style={[styles.pastorCard, { backgroundColor: theme.surfaceVariant }]}>
             <View style={styles.pastorHeader}>
-              {/* Fallback caso a fotoUrl venha vazia */}
               <Image 
                 source={{ uri: pastor.fotoUrl || 'https://via.placeholder.com/150' }} 
                 style={[styles.avatar, { borderColor: theme.primary }]} 
@@ -69,6 +74,14 @@ export default function QuemSomosScreen() {
             <Text style={[styles.pastorBio, { color: theme.textSecondary }]}>{pastor.bio}</Text>
           </View>
         ))
+      ) : (
+        /* Estado para Visitantes */
+        <View style={[styles.lockCard, { backgroundColor: theme.surfaceVariant }]}>
+          <Text style={styles.lockIcon}>🔒</Text>
+          <Text style={[styles.lockText, { color: theme.textSecondary }]}>
+            Informações de liderança visíveis apenas para membros registrados.
+          </Text>
+        </View>
       )}
 
       <View style={[styles.divider, { backgroundColor: theme.border }]} />
@@ -99,6 +112,16 @@ export default function QuemSomosScreen() {
 }
 
 const styles = StyleSheet.create({
+  // ... estilos anteriores ...
+  lockCard: { padding: 20, borderRadius: 12, alignItems: 'center', gap: 10 },
+  lockIcon: { fontSize: 24 },
+  lockText: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  // Correção na URL do Maps
+  contactCard: { padding: 20, borderRadius: 12, marginBottom: 10 },
+  contactItem: { marginBottom: 15 },
+  contactLabel: { fontSize: 11, fontWeight: 'bold', letterSpacing: 1, marginBottom: 4 },
+  contactValue: { fontSize: 15, lineHeight: 20 },
+  // Reutilizando os estilos que você já tinha
   container: { flex: 1, padding: 20 },
   mainTitle: { fontSize: 24, fontWeight: 'bold', textAlign: 'center', marginBottom: 30, letterSpacing: 2 },
   sectionMargin: { marginBottom: 25 },
@@ -112,10 +135,4 @@ const styles = StyleSheet.create({
   pastorNome: { fontSize: 18, fontWeight: 'bold' },
   pastorCargo: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   pastorBio: { fontSize: 14, lineHeight: 20, fontStyle: 'italic' },
-  
-  // Estilos da nova seção
-  contactCard: { padding: 20, borderRadius: 12, marginBottom: 10 },
-  contactItem: { marginBottom: 15 },
-  contactLabel: { fontSize: 11, fontWeight: 'bold', letterSpacing: 1, marginBottom: 4 },
-  contactValue: { fontSize: 15, lineHeight: 20 }
 });
