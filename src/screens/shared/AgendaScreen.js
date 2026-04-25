@@ -1,12 +1,4 @@
-// screens/shared/AgendaScreen.js
-//
-// Correções aplicadas sobre a versão original:
-//   - firestore() → getFirestore() (API modular, padrão do projeto)
-//   - item.name  → item.title (campo correto conforme contexto técnico)
-//   - Adicionado modal de detalhe ao tocar no card
-//   - Adicionado estado vazio e pull-to-refresh
-
-import React, { useEffect, useState, useCallback, } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, ActivityIndicator, StyleSheet,
   TouchableOpacity, Modal, ScrollView, RefreshControl,
@@ -16,99 +8,124 @@ import {
   where, orderBy, onSnapshot
 } from '@react-native-firebase/firestore';
 import { useAppTheme } from '../../themes';
-import { useAuth }     from '../../contexts/AuthContext';
-import notifee,{TriggerType, AndroidImportance} from '@notifee/react-native';
+import { useAuth } from '../../contexts/AuthContext';
+import notifee, { TriggerType, AndroidImportance } from '@notifee/react-native';
 
 export default function AgendaScreen() {
-  const theme           = useAppTheme();
-  const { role }        = useAuth();
-  const s               = makeStyles(theme);
+  const theme = useAppTheme();
+  const { role } = useAuth();
+  const s = makeStyles(theme);
 
-  const [eventos,    setEventos]    = useState([]);
-  const [loading,    setLoading]    = useState(true);
+  const [eventos, setEventos] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [detalhe,    setDetalhe]    = useState(null);
+  const [detalhe, setDetalhe] = useState(null);
 
-// ─── teste botão ──────────────────────────────────────────────
- const dispararAgora = async () => {
-  // 1. Notificação Imediata (O que você já fez)
-  await notifee.displayNotification({
-    title: 'Teste Imediato 🚀',
-    body: 'O sistema de notificações está respondendo!',
-    android: {
-      channelId: 'eventos_lembretes',
-      importance: 4,
-      pressAction: { id: 'default' },
-    },
-  });
+  // ─── Lógica de Notificação ──────────────────────────────────────────
 
-  // 2. Teste de Agendamento (Para daqui a 10 segundos)
-  // Isso valida se o seu celular permite "Triggers" (alarmes exatos)
-  const date = new Date(Date.now() + 10000); // 10 segundos no futuro
+  const agendarLembretesEvento = async (item) => {
+    const agora = new Date();
+    const dataEvento = item.inicioJS;
+    const intervalos = [7, 3, 1, 0];
 
- const trigger = {
-  type: TriggerType.TIMESTAMP,
-  timestamp: date.getTime(),
-};
+    try {
+      // Limpeza de IDs anteriores para garantir idempotência
+      for (const dias of intervalos) {
+        await notifee.cancelNotification(`${item.id}-${dias}`);
+      }
 
-  await notifee.createTriggerNotification(
-    {
-      title: 'Lembrete Agendado ⏰',
-      body: 'Este alerta foi programado há 10 segundos atrás.',
-      android: {
-        channelId: 'eventos_lembretes',
-      },
-    },
-    trigger,
-  );
+      for (const dias of intervalos) {
+        const dataAlvo = new Date(dataEvento);
+        dataAlvo.setDate(dataAlvo.getDate() - dias);
+        dataAlvo.setHours(9, 0, 0, 0);
 
-  alert('Notificação imediata enviada e agendamento para daqui a 10s criado!');
-};
+        if (dataAlvo > agora) {
+          const trigger = {
+            type: TriggerType.TIMESTAMP,
+            timestamp: dataAlvo.getTime(),
+            alarmManager: true,
+          };
 
-  // ─── Listener em tempo real ──────────────────────────────────────────────
+          await notifee.createTriggerNotification(
+            {
+              id: `${item.id}-${dias}`,
+              title: dias === 0 ? `Hoje: ${item.name}` : `Lembrete: ${item.name}`,
+              body: dias === 0 
+                ? `O evento começa hoje às ${item.inicioJS.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}!`
+                : `Faltam ${dias} ${dias === 1 ? 'dia' : 'dias'} para o evento.`,
+              android: {
+                channelId: 'eventos_lembretes',
+                importance: AndroidImportance.HIGH,
+                pressAction: { id: 'default' },
+              },
+            },
+            trigger
+          );
+        }
+      }
+    } catch (error) {
+      console.error(`Falha no agendamento: ${item.name}`, error);
+    }
+  };
+
+  // ─── Listener em Tempo Real (dataStream) ──────────────────────────────
 
   const iniciarListener = useCallback(() => {
-    const db   = getFirestore();
+    const db = getFirestore();
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    const q = query(
+    const dataStream = query(
       collection(db, 'agenda'),
       where('status', '==', 'ativo'),
-      orderBy('dateStart', 'asc'),
+      orderBy('dateStart', 'asc')
     );
 
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(dataStream, async (snap) => {
       const list = [];
+      const agora = new Date();
 
       snap.forEach((doc) => {
-        const data  = doc.data();
+        const data = doc.data();
         const inicio = data.dateStart?.toDate?.();
-        const fim    = data.dateEnd?.toDate?.() ?? inicio;
+        const fim = data.dateEnd?.toDate?.() ?? inicio;
 
-        // Filtra eventos já encerrados
         if (!inicio || fim < hoje) return;
 
-        // Filtra por visibilidade conforme role
-        let podeVer = false;
-        if (data.visibility === 0) podeVer = true;
-        if (data.visibility === 1 && (role === 'membro' || role === 'admin')) podeVer = true;
-        if (data.visibility === 2 && role === 'admin') podeVer = true;
+        // Regras de Visibilidade (Autorização)
+        const isAuthorized = 
+          (data.visibility === 0) || 
+          (data.visibility === 1 && (role === 'membro' || role === 'admin')) || 
+          (role === 'admin'); // visibility 2
 
-        if (!podeVer) return;
+        if (!isAuthorized) return;
 
         const diasFaltando = Math.ceil((inicio - hoje) / (1000 * 60 * 60 * 24));
 
-        list.push({ id: doc.id, ...data, inicioJS: inicio, fimJS: fim, diasFaltando });
+        list.push({ 
+          id: doc.id, 
+          ...data, 
+          title: data.name, // Mapeamento correto do Firebase
+          inicioJS: inicio, 
+          fimJS: fim, 
+          diasFaltando 
+        });
       });
 
       setEventos(list);
+
+      // Processamento assíncrono de notificações
+      for (const item of list) {
+        if (item.inicioJS > agora) {
+          await agendarLembretesEvento(item);
+        }
+      }
+
       setLoading(false);
       setRefreshing(false);
     }, (err) => {
-      console.error('AgendaScreen - erro:', err);
+      console.error('Erro no fluxo de dados:', err);
       setLoading(false);
-      setRefreshing(false);
     });
 
     return unsub;
@@ -121,17 +138,16 @@ export default function AgendaScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    // onSnapshot já vai re-disparar; setRefreshing(false) acontece no callback
   }, []);
 
-  // ─── Render item ─────────────────────────────────────────────────────────
+  // ─── Renderização ──────────────────────────────────────────────────
 
   const renderItem = ({ item }) => {
     const { inicioJS: inicio, fimJS: fim } = item;
-    if (!inicio || !(inicio instanceof Date)) return null;
+    if (!inicio) return null;
 
     const multiDia = fim && inicio.toLocaleDateString() !== fim.toLocaleDateString();
-    const visIcon  = item.visibility === 1 ? ' 👥' : item.visibility === 2 ? ' 🔒' : '';
+    const visIcon = item.visibility === 1 ? ' 👥' : item.visibility === 2 ? ' 🔒' : '';
 
     return (
       <TouchableOpacity
@@ -139,7 +155,6 @@ export default function AgendaScreen() {
         onPress={() => setDetalhe(item)}
         activeOpacity={0.85}
       >
-        {/* Badge de data */}
         <View style={s.dateContainer}>
           <View style={[s.dateBadge, { backgroundColor: theme.primary }]}>
             <Text style={s.dateText}>{inicio.getDate()}</Text>
@@ -152,13 +167,10 @@ export default function AgendaScreen() {
           </Text>
         </View>
 
-        {/* Info */}
         <View style={s.infoContainer}>
           <Text style={[s.eventName, { color: theme.text }]} numberOfLines={2}>
-            {/* ← CORREÇÃO: era item.name, campo correto é item.title */}
             {item.title}{visIcon}
           </Text>
-
           <View style={s.detailRow}>
             <Text style={[s.detailIcon, { color: theme.primary }]}>📅</Text>
             <Text style={[s.detailText, { color: theme.textSecondary }]}>
@@ -166,33 +178,17 @@ export default function AgendaScreen() {
               {multiDia ? ` até ${fim.toLocaleDateString('pt-BR')}` : ''}
             </Text>
           </View>
-
           <View style={s.detailRow}>
             <Text style={[s.detailIcon, { color: theme.primary }]}>🕐</Text>
             <Text style={[s.detailText, { color: theme.textSecondary }]}>
               {inicio.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-              {multiDia && fim
-                ? ` — término: ${fim.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                : ''}
             </Text>
           </View>
-
-          {item.location && (
-            <View style={s.detailRow}>
-              <Text style={[s.detailIcon, { color: theme.primary }]}>📍</Text>
-              <Text style={[s.detailText, { color: theme.textSecondary }]} numberOfLines={1}>
-                {item.location}
-              </Text>
-            </View>
-          )}
         </View>
-
         <Text style={[s.arrow, { color: theme.textDisabled }]}>›</Text>
       </TouchableOpacity>
     );
   };
-
-  // ─── Render ───────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -209,34 +205,21 @@ export default function AgendaScreen() {
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={s.listContent}
-        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
         }
-        ListHeaderComponent={
-          <Text style={[s.title, { color: theme.primary }]}>AGENDA</Text>
-        }
+        ListHeaderComponent={<Text style={[s.title, { color: theme.primary }]}>AGENDA</Text>}
         ListEmptyComponent={
           <View style={s.empty}>
             <Text style={s.emptyIcon}>📅</Text>
-            <Text style={[s.emptyText, { color: theme.textSecondary }]}>
-              Nenhum evento programado.
-            </Text>
+            <Text style={[s.emptyText, { color: theme.textSecondary }]}>Nenhum evento programado.</Text>
           </View>
         }
       />
-
       {detalhe && (
         <EventoModal evento={detalhe} theme={theme} onClose={() => setDetalhe(null)} />
       )}
-
-      <TouchableOpacity style={[s.fecharBtn, { backgroundColor: theme.surfaceVariant, borderColor: theme.border }]}
-      onPress={dispararAgora}>
-
-        <Text style={[s.fecharBtnText, { color: theme.text }]}>Notificaçao teste</Text>
-      </TouchableOpacity>
     </View>
-    
   );
 }
 

@@ -6,22 +6,22 @@ import notifee, { AndroidImportance } from '@notifee/react-native';
 
 export default function App() {
 
-  useEffect(() => {
-    // Configuração inicial do canal de notificação (Obrigatório para Android)
-    const setupNotifications = async () => {
-      // Cria o canal necessário para o Android exibir os alertas
-      await notifee.createChannel({
-        id: 'eventos_lembretes',
-        name: 'Lembretes e Pedidos',
-        importance: AndroidImportance.HIGH,
-      });
+ // App.js
+useEffect(() => {
+  const setupNotifications = async () => {
+    // Cria o canal com configurações de alta prioridade
+    await notifee.createChannel({
+      id: 'eventos_lembretes',
+      name: 'Lembretes e Pedidos',
+      importance: AndroidImportance.HIGH,
+      vibration: true, // Adicionado conforme App.tsx
+    });
 
-      // Opcional: Solicita permissão para Android 13+
-      await notifee.requestPermission();
-    };
+    await notifee.requestPermission();
+  };
 
-    setupNotifications();
-  }, []);
+  setupNotifications();
+}, []);
 
 
 
