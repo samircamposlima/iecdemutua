@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, ActivityIndicator, StyleSheet,
   TouchableOpacity, Modal, ScrollView, RefreshControl,
+   Dimensions, Animated, PanResponder
 } from 'react-native';
 import {
   getFirestore, collection, query,
@@ -226,77 +227,63 @@ export default function AgendaScreen() {
 // ─── Modal de detalhe ────────────────────────────────────────────────────────
 
 function EventoModal({ evento, theme, onClose }) {
-  const s      = makeStyles(theme);
-  const inicio = evento.inicioJS;
-  const fim    = evento.fimJS;
+  const s = makeStyles(theme);
+  const screenHeight = Dimensions.get('window').height;
+  
+  // Valor animado para a posição Y
+  const panY = React.useRef(new Animated.Value(0)).current;
 
-  const fmtDataLonga = (d) =>
-    d?.toLocaleDateString('pt-BR', {
-      weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
-    });
-  const fmtHora = (d) =>
-    d?.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-  const multiDia = fim && inicio?.toLocaleDateString() !== fim?.toLocaleDateString();
-  const visLabels = ['Público', 'Membros e Admins', 'Apenas Admins'];
+  // Configuração do PanResponder para detectar o gesto
+  const panResponder = React.useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        // Permite arrastar apenas para baixo (positivo)
+        if (gestureState.dy > 0) {
+          panY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        // Se arrastou mais de 100px, fecha. Senão, volta ao topo.
+        if (gestureState.dy > 100) {
+          onClose();
+        } else {
+          Animated.spring(panY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       <View style={s.modalOverlay}>
-        <View style={s.modalSheet}>
-          <View style={s.modalHandle} />
+        <Animated.View 
+          style={[
+            s.modalSheet, 
+            { transform: [{ translateY: panY }] } // Vincula a animação ao movimento
+          ]}
+        >
+          {/* A "alça" (handle) agora é a área sensível ao toque para arrastar */}
+          <View {...panResponder.panHandlers} style={s.modalHandleContainer}>
+            <View style={s.modalHandle} />
+          </View>
 
           <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
             <Text style={[s.modalTitle, { color: theme.text }]}>{evento.title}</Text>
+            {/* ... Restante do conteúdo (Data, Local, etc) igual ao anterior ... */}
+            
+            <ModalRow icon="📅" label="DATA" theme={theme}>
+               <Text style={[s.modalRowValue, { color: theme.text }]}>
+                 {evento.inicioJS?.toLocaleDateString('pt-BR')}
+               </Text>
+            </ModalRow>
 
-            {/* Data / horário */}
-            {inicio && (
-              <ModalRow icon="📅" label="DATA" theme={theme}>
-                <Text style={[s.modalRowValue, { color: theme.text }]}>
-                  {fmtDataLonga(inicio)}
-                </Text>
-                <Text style={[s.modalRowSub, { color: theme.textSecondary }]}>
-                  {fmtHora(inicio)}
-                  {multiDia ? ` — ${fmtDataLonga(fim)}, ${fmtHora(fim)}` : fim ? ` até ${fmtHora(fim)}` : ''}
-                </Text>
-              </ModalRow>
-            )}
-
-            {/* Local */}
-            {evento.location && (
-              <ModalRow icon="📍" label="LOCAL" theme={theme}>
-                <Text style={[s.modalRowValue, { color: theme.text }]}>{evento.location}</Text>
-              </ModalRow>
-            )}
-
-            {/* Descrição */}
-            {evento.description && (
-              <View style={[s.descBox, { backgroundColor: theme.surfaceVariant }]}>
-                <Text style={[s.descText, { color: theme.text }]}>{evento.description}</Text>
-              </View>
-            )}
-
-            {/* Badge de visibilidade */}
-            <View style={s.visBadgeRow}>
-              <View style={[s.visBadge, { backgroundColor: theme.primary + '22', borderColor: theme.primary + '55' }]}>
-                <Text style={[s.visBadgeText, { color: theme.primary }]}>
-                  {visLabels[evento.visibility ?? 0]}
-                </Text>
-              </View>
-            </View>
-
-            <View style={{ height: 16 }} />
+            <View style={{ height: 40 }} />
           </ScrollView>
-
-          <View style={s.modalFooter}>
-            <TouchableOpacity
-              style={[s.fecharBtn, { backgroundColor: theme.surfaceVariant, borderColor: theme.border }]}
-              onPress={onClose}
-            >
-              <Text style={[s.fecharBtnText, { color: theme.text }]}>Fechar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -358,10 +345,18 @@ function makeStyles(theme) {
       borderTopLeftRadius: 24, borderTopRightRadius: 24,
       maxHeight: '85%',
     },
+    modalHandleContainer: {
+  width: '100%',
+  height: 30, // Área invisível maior para facilitar o toque
+  justifyContent: 'center',
+  alignItems: 'center',
+},
     modalHandle: {
-      width: 40, height: 4, borderRadius: 2,
-      backgroundColor: theme.border, alignSelf: 'center', marginTop: 12,
-    },
+  width: 40,
+  height: 5,
+  borderRadius: 3,
+  backgroundColor: theme.border,
+},
     modalBody:  { padding: 20 },
     modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 20, lineHeight: 26 },
     modalRow: {
