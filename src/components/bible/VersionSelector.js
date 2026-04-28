@@ -3,9 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native
 import { useAppTheme } from '../../themes';
 import { BIBLE_VERSIONS } from '../../utils/constants/Bibles';
 
-
+/**
+ * VersionSelector: Componente de interface para troca de versões da Bíblia.
+ * Renderiza uma lista de opções baseada nas constantes do sistema.
+ */
 export default function VersionSelector({ currentVersion, onSelect }) {
-  const theme = useAppTheme();
+  const theme = useAppTheme(); // Hook de tema para suporte a Dark/Light mode
 
   return (
     <FlatList
@@ -13,6 +16,7 @@ export default function VersionSelector({ currentVersion, onSelect }) {
       keyExtractor={item => item.id}
       contentContainerStyle={{ padding: 16 }}
       renderItem={({ item }) => {
+        // Verifica se esta versão é a que está atualmente ativa no estado global/hook
         const active = item.id === currentVersion?.id;
         return (
           <TouchableOpacity

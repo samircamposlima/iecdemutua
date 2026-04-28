@@ -1,3 +1,7 @@
+/**
+ * Catálogo de Versões da Bíblia
+ * Mapeia IDs de persistência para arquivos físicos e nomes de exibição.
+ */
 export const BIBLE_VERSIONS = [
   { id: 'ACF',  label: 'Almeida Corrigida Fiel',         file: 'ACF.db'  },
   { id: 'ARA',  label: 'Almeida Revista e Atualizada',   file: 'ARA.db'  },

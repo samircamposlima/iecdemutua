@@ -1,6 +1,7 @@
 /**
- * BibliaScreen.js — atualizado para BibleService assíncrono
- * Picker de versão sempre visível + livros → capítulos → versículos
+ * BibliaScreen.js
+ * Fluxo: Picker Versão -> Seleção Livro -> Seleção Capítulo -> Seleção Versículo (Navegação)
+ * Inclui: Hardware Back Handler para Android e Banner de Continuidade.
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -27,6 +28,7 @@ export default function BibliaScreen() {
   const s          = makeStyles(theme);
   const navigation = useNavigation();
 
+  // Hooks do Contexto/Custom Hook da Bíblia
   const {
     version, selectVersion, metadata,
     books, loadingBooks, testamentFilter, setTestamentFilter,

@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, FlatList, ActivityIndicator, StyleSheet,
-  TouchableOpacity, Modal, ScrollView, RefreshControl,
-   Dimensions, Animated, PanResponder
+  TouchableOpacity, Modal, RefreshControl,
+  Animated, PanResponder
 } from 'react-native';
 import {
   getFirestore, collection, query,
@@ -10,7 +10,9 @@ import {
 } from '@react-native-firebase/firestore';
 import { useAppTheme } from '../../themes';
 import { useAuth } from '../../contexts/AuthContext';
+import EventoModal from '../../components/EventoModal';
 import notifee, { TriggerType, AndroidImportance } from '@notifee/react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 
 export default function AgendaScreen() {
   const theme = useAppTheme();
@@ -21,37 +23,25 @@ export default function AgendaScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [detalhe, setDetalhe] = useState(null);
-
-  // ─── Lógica de Notificação ──────────────────────────────────────────
+  const unsubRef = React.useRef(null);
 
   const agendarLembretesEvento = async (item) => {
     const agora = new Date();
-    const dataEvento = item.inicioJS;
     const intervalos = [7, 3, 1, 0];
-
     try {
-      // Limpeza de IDs anteriores para garantir idempotência
       for (const dias of intervalos) {
         await notifee.cancelNotification(`${item.id}-${dias}`);
       }
-
       for (const dias of intervalos) {
-        const dataAlvo = new Date(dataEvento);
+        const dataAlvo = new Date(item.inicioJS);
         dataAlvo.setDate(dataAlvo.getDate() - dias);
         dataAlvo.setHours(9, 0, 0, 0);
-
         if (dataAlvo > agora) {
-          const trigger = {
-            type: TriggerType.TIMESTAMP,
-            timestamp: dataAlvo.getTime(),
-            alarmManager: true,
-          };
-
           await notifee.createTriggerNotification(
             {
               id: `${item.id}-${dias}`,
               title: dias === 0 ? `Hoje: ${item.name}` : `Lembrete: ${item.name}`,
-              body: dias === 0 
+              body: dias === 0
                 ? `O evento começa hoje às ${item.inicioJS.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}!`
                 : `Faltam ${dias} ${dias === 1 ? 'dia' : 'dias'} para o evento.`,
               android: {
@@ -60,7 +50,7 @@ export default function AgendaScreen() {
                 pressAction: { id: 'default' },
               },
             },
-            trigger
+            { type: TriggerType.TIMESTAMP, timestamp: dataAlvo.getTime(), alarmManager: true }
           );
         }
       }
@@ -69,84 +59,72 @@ export default function AgendaScreen() {
     }
   };
 
-  // ─── Listener em Tempo Real (dataStream) ──────────────────────────────
-
   const iniciarListener = useCallback(() => {
     const db = getFirestore();
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    const dataStream = query(
-      collection(db, 'agenda'),
-      where('status', '==', 'ativo'),
-      orderBy('dateStart', 'asc')
-    );
+    const unsub = onSnapshot(
+      query(
+        collection(db, 'agenda'),
+        where('status', '==', 'ativo'),
+        orderBy('dateStart', 'asc')
+      ),
+      async (snap) => {
+        const list = [];
+        const agora = new Date();
 
-    const unsub = onSnapshot(dataStream, async (snap) => {
-      const list = [];
-      const agora = new Date();
+        snap.forEach((doc) => {
+          const data = doc.data();
+          const inicio = data.dateStart?.toDate?.();
+          const fim = data.dateEnd?.toDate?.() ?? inicio;
+          if (!inicio || fim < hoje) return;
 
-      snap.forEach((doc) => {
-        const data = doc.data();
-        const inicio = data.dateStart?.toDate?.();
-        const fim = data.dateEnd?.toDate?.() ?? inicio;
+          const isAuthorized =
+            data.visibility === 0 ||
+            (data.visibility === 1 && (role === 'membro' || role === 'admin')) ||
+            role === 'admin';
+          if (!isAuthorized) return;
 
-        if (!inicio || fim < hoje) return;
-
-        // Regras de Visibilidade (Autorização)
-        const isAuthorized = 
-          (data.visibility === 0) || 
-          (data.visibility === 1 && (role === 'membro' || role === 'admin')) || 
-          (role === 'admin'); // visibility 2
-
-        if (!isAuthorized) return;
-
-        const diasFaltando = Math.ceil((inicio - hoje) / (1000 * 60 * 60 * 24));
-
-        list.push({ 
-          id: doc.id, 
-          ...data, 
-          title: data.name, // Mapeamento correto do Firebase
-          inicioJS: inicio, 
-          fimJS: fim, 
-          diasFaltando 
+          const diasFaltando = Math.ceil((inicio - hoje) / (1000 * 60 * 60 * 24));
+          list.push({ id: doc.id, ...data, title: data.name, inicioJS: inicio, fimJS: fim, diasFaltando });
         });
-      });
 
-      setEventos(list);
+        setEventos(list);
 
-      // Processamento assíncrono de notificações
-      for (const item of list) {
-        if (item.inicioJS > agora) {
-          await agendarLembretesEvento(item);
+        for (const item of list) {
+          if (item.inicioJS > agora) await agendarLembretesEvento(item);
         }
-      }
 
-      setLoading(false);
-      setRefreshing(false);
-    }, (err) => {
-      console.error('Erro no fluxo de dados:', err);
-      setLoading(false);
-    });
+        // ← Sempre fecha loading e refreshing
+        setLoading(false);
+        setRefreshing(false);
+      },
+      (err) => {
+        console.error('Erro no listener:', err);
+        setLoading(false);
+        setRefreshing(false);
+      }
+    );
 
     return unsub;
   }, [role]);
 
   useEffect(() => {
-    const unsub = iniciarListener();
-    return unsub;
+    unsubRef.current = iniciarListener();
+    return () => unsubRef.current?.();
   }, [iniciarListener]);
 
+  // ← Cancela e reinicia o listener — sem loop infinito
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-  }, []);
-
-  // ─── Renderização ──────────────────────────────────────────────────
+    unsubRef.current?.();
+    unsubRef.current = iniciarListener();
+  }, [iniciarListener]);
 
   const renderItem = ({ item }) => {
     const { inicioJS: inicio, fimJS: fim } = item;
     if (!inicio) return null;
-
     const multiDia = fim && inicio.toLocaleDateString() !== fim.toLocaleDateString();
     const visIcon = item.visibility === 1 ? ' 👥' : item.visibility === 2 ? ' 🔒' : '';
 
@@ -167,7 +145,6 @@ export default function AgendaScreen() {
             {item.diasFaltando === 0 ? 'HOJE' : `Em ${item.diasFaltando}d`}
           </Text>
         </View>
-
         <View style={s.infoContainer}>
           <Text style={[s.eventName, { color: theme.text }]} numberOfLines={2}>
             {item.title}{visIcon}
@@ -207,7 +184,14 @@ export default function AgendaScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={s.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.primary} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            enabled={detalhe === null}
+            colors={[theme.primary]}
+            progressBackgroundColor={theme.surface}
+            tintColor={theme.primary}
+          />
         }
         ListHeaderComponent={<Text style={[s.title, { color: theme.primary }]}>AGENDA</Text>}
         ListEmptyComponent={
@@ -218,91 +202,16 @@ export default function AgendaScreen() {
         }
       />
       {detalhe && (
-        <EventoModal evento={detalhe} theme={theme} onClose={() => setDetalhe(null)} />
+         <EventoModal
+    evento={detalhe}
+    theme={theme}
+    onClose={() => setDetalhe(null)}
+  />
       )}
     </View>
   );
 }
 
-// ─── Modal de detalhe ────────────────────────────────────────────────────────
-
-function EventoModal({ evento, theme, onClose }) {
-  const s = makeStyles(theme);
-  const screenHeight = Dimensions.get('window').height;
-  
-  // Valor animado para a posição Y
-  const panY = React.useRef(new Animated.Value(0)).current;
-
-  // Configuração do PanResponder para detectar o gesto
-  const panResponder = React.useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderMove: (_, gestureState) => {
-        // Permite arrastar apenas para baixo (positivo)
-        if (gestureState.dy > 0) {
-          panY.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        // Se arrastou mais de 100px, fecha. Senão, volta ao topo.
-        if (gestureState.dy > 100) {
-          onClose();
-        } else {
-          Animated.spring(panY, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
-
-  return (
-    <Modal visible animationType="slide" transparent onRequestClose={onClose}>
-      <View style={s.modalOverlay}>
-        <Animated.View 
-          style={[
-            s.modalSheet, 
-            { transform: [{ translateY: panY }] } // Vincula a animação ao movimento
-          ]}
-        >
-          {/* A "alça" (handle) agora é a área sensível ao toque para arrastar */}
-          <View {...panResponder.panHandlers} style={s.modalHandleContainer}>
-            <View style={s.modalHandle} />
-          </View>
-
-          <ScrollView style={s.modalBody} showsVerticalScrollIndicator={false}>
-            <Text style={[s.modalTitle, { color: theme.text }]}>{evento.title}</Text>
-            {/* ... Restante do conteúdo (Data, Local, etc) igual ao anterior ... */}
-            
-            <ModalRow icon="📅" label="DATA" theme={theme}>
-               <Text style={[s.modalRowValue, { color: theme.text }]}>
-                 {evento.inicioJS?.toLocaleDateString('pt-BR')}
-               </Text>
-            </ModalRow>
-
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        </Animated.View>
-      </View>
-    </Modal>
-  );
-}
-
-function ModalRow({ icon, label, theme, children }) {
-  const s = makeStyles(theme);
-  return (
-    <View style={s.modalRow}>
-      <Text style={s.modalRowIcon}>{icon}</Text>
-      <View style={{ flex: 1 }}>
-        <Text style={[s.modalRowLabel, { color: theme.primary }]}>{label}</Text>
-        {children}
-      </View>
-    </View>
-  );
-}
-
-// ─── Estilos ──────────────────────────────────────────────────────────────────
 
 function makeStyles(theme) {
   return StyleSheet.create({
@@ -310,8 +219,6 @@ function makeStyles(theme) {
     center:      { flex: 1, justifyContent: 'center', alignItems: 'center' },
     listContent: { padding: 20, paddingBottom: 48 },
     title:       { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
-
-    // Card
     card: {
       flexDirection: 'row', alignItems: 'center',
       padding: 15, borderRadius: 12, marginBottom: 14, elevation: 2,
@@ -330,13 +237,9 @@ function makeStyles(theme) {
     detailIcon:   { fontSize: 12, marginRight: 5 },
     detailText:   { fontSize: 13 },
     arrow:        { fontSize: 24, paddingLeft: 8 },
-
-    // Empty
-    empty:     { alignItems: 'center', paddingTop: 60, gap: 12 },
-    emptyIcon: { fontSize: 40 },
-    emptyText: { fontSize: 15 },
-
-    // Modal
+    empty:        { alignItems: 'center', paddingTop: 60, gap: 12 },
+    emptyIcon:    { fontSize: 40 },
+    emptyText:    { fontSize: 15 },
     modalOverlay: {
       flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end',
     },
@@ -346,22 +249,16 @@ function makeStyles(theme) {
       maxHeight: '85%',
     },
     modalHandleContainer: {
-  width: '100%',
-  height: 30, // Área invisível maior para facilitar o toque
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-    modalHandle: {
-  width: 40,
-  height: 5,
-  borderRadius: 3,
-  backgroundColor: theme.border,
-},
-    modalBody:  { padding: 20 },
-    modalTitle: { fontSize: 20, fontWeight: '700', marginBottom: 20, lineHeight: 26 },
-    modalRow: {
-      flexDirection: 'row', gap: 12, marginBottom: 18,
+      width: '100%', height: 30,
+      justifyContent: 'center', alignItems: 'center',
     },
+    modalHandle: {
+      width: 40, height: 5, borderRadius: 3,
+      backgroundColor: theme.border,
+    },
+    modalBody:     { padding: 20 },
+    modalTitle:    { fontSize: 20, fontWeight: '700', marginBottom: 20, lineHeight: 26 },
+    modalRow:      { flexDirection: 'row', gap: 12, marginBottom: 18 },
     modalRowIcon:  { fontSize: 20, marginTop: 2 },
     modalRowLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 1, marginBottom: 4 },
     modalRowValue: { fontSize: 15, fontWeight: '500', lineHeight: 20 },
@@ -370,13 +267,13 @@ function makeStyles(theme) {
       borderRadius: 10, padding: 14, marginBottom: 16,
       borderLeftWidth: 3, borderLeftColor: theme.primary,
     },
-    descText:    { fontSize: 14, lineHeight: 22 },
-    visBadgeRow: { flexDirection: 'row' },
+    descText:      { fontSize: 14, lineHeight: 22 },
+    visBadgeRow:   { flexDirection: 'row' },
     visBadge: {
       borderRadius: 8, borderWidth: 1,
       paddingHorizontal: 10, paddingVertical: 4,
     },
-    visBadgeText: { fontSize: 12, fontWeight: '600' },
+    visBadgeText:  { fontSize: 12, fontWeight: '600' },
     modalFooter: {
       padding: 16, borderTopWidth: 1, borderTopColor: theme.divider,
     },

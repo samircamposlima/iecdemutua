@@ -1,45 +1,42 @@
-// ─── TEMA — IEC de Mutua ───────────────────────────────────────────────────
-// Paleta: Preto + Branco + Dourado
-// Uso: import { useAppTheme } from '../themes';
-//      const theme = useAppTheme();
-//      <Text style={{ color: theme.text }}>
-// ──────────────────────────────────────────────────────────────────────────
-
 import { useColorScheme } from 'react-native';
 
-// Tokens fixos — iguais no claro e no escuro
+/**
+ * Tokens de Marca (Fixos)
+ * O dourado é a identidade visual e não sofre inversão de cor.
+ */
 const gold = {
-  primary:   '#C9A84C',   // dourado principal — botões, ícones ativos, destaques
-  light:     '#E8D48B',   // dourado claro — hover, bordas suaves
-  dark:      '#9A7B2F',   // dourado escuro — texto sobre fundo claro
+  primary:   '#C9A84C',   // Dourado institucional
+  light:     '#E8D48B',   // Destaques sutis / Bordas
+  dark:      '#9A7B2F',   // Variável para melhor legibilidade sobre claros
+  goldTransparent: 'rgba(201, 168, 76, 0.15)', // Para highlights de versículos
 };
 
 const light = {
   // Fundos
-  background:        '#F5F5F5',   // fundo de telas
-  surface:           '#FFFFFF',   // cards, modais, drawers
-  surfaceVariant:    '#EFEFEF',   // inputs, linhas alternadas
+  background:      '#F5F5F5',
+  surface:         '#FFFFFF',
+  surfaceVariant:  '#EFEFEF',
 
   // Textos
-  text:              '#1A1A1A',   // texto principal
-  textSecondary:     '#555555',   // subtítulos, labels
-  textDisabled:      '#AAAAAA',   // placeholder, desabilitado
-  textOnGold:        '#1A1A1A',   // texto sobre fundo dourado
+  text:            '#1A1A1A',
+  textSecondary:   '#555555',
+  textDisabled:    '#AAAAAA',
+  textOnGold:      '#000000',
 
-  // Dourado
+  // Paleta de Marca
   ...gold,
 
-  // Bordas e divisores
-  border:            '#DDDDDD',
-  divider:           '#E8E8E8',
+  // Estrutura
+  border:          '#DDDDDD',
+  divider:         '#E8E8E8',
 
-  // Feedback
+  // Feedback (Ajustado para contraste em fundo claro)
   error:             '#C0392B',
   success:           '#27AE60',
   warning:           '#F39C12',
 
-  // Drawer / Header
-  drawerBackground:  '#1A1A1A',   // gaveta sempre escura (contraste com o dourado)
+  // Layout — Gaveta e Topo mantêm identidade sóbria
+  drawerBackground:  '#1A1A1A',
   drawerText:        '#FFFFFF',
   drawerActive:      '#C9A84C',
   headerBackground:  '#1A1A1A',
@@ -48,29 +45,29 @@ const light = {
 
 const dark = {
   // Fundos
-  background:        '#121212',
-  surface:           '#1E1E1E',
-  surfaceVariant:    '#2A2A2A',
+  background:      '#121212',
+  surface:         '#1E1E1E',
+  surfaceVariant:  '#2A2A2A',
 
   // Textos
-  text:              '#F0F0F0',
-  textSecondary:     '#AAAAAA',
-  textDisabled:      '#555555',
-  textOnGold:        '#1A1A1A',
+  text:            '#F0F0F0',
+  textSecondary:   '#AAAAAA',
+  textDisabled:    '#555555',
+  textOnGold:      '#000000',
 
-  // Dourado (igual — é um token de marca, não muda com o tema)
+  // Paleta de Marca
   ...gold,
 
-  // Bordas e divisores
-  border:            '#333333',
-  divider:           '#2A2A2A',
+  // Estrutura
+  border:          '#333333',
+  divider:         '#2A2A2A',
 
-  // Feedback
+  // Feedback (Ajustado para brilho em fundo escuro)
   error:             '#E74C3C',
   success:           '#2ECC71',
   warning:           '#F1C40F',
 
-  // Drawer / Header — mantém escuro nos dois modos
+  // Layout — Intensifica o preto para profundidade (OLED)
   drawerBackground:  '#0D0D0D',
   drawerText:        '#FFFFFF',
   drawerActive:      '#C9A84C',
@@ -78,14 +75,14 @@ const dark = {
   headerText:        '#FFFFFF',
 };
 
-// Hook — use em qualquer componente
+/**
+ * Hook customizado para acesso dinâmico ao tema.
+ * Implementa a lógica matemática de seleção baseada no esquema do sistema.
+ */
 export function useAppTheme() {
-  const scheme = useColorScheme(); // 'light' | 'dark' | null
+  const scheme = useColorScheme(); 
   return scheme === 'dark' ? dark : light;
 }
 
-// Exporta os objetos puros caso precise fora de componente
 export const themes = { light, dark };
-
-// Exporta o dourado separado — útil para StyleSheet estático
 export { gold };

@@ -1,12 +1,3 @@
-/**
- * BibleStorage.js
- * Equivalente a:
- *   - BibleReadingPreferencesRepository (DataStore → AsyncStorage)
- *   - BibleVersionRepository (SharedPreferences → AsyncStorage)
- *
- * Persiste: versão selecionada + última posição de leitura
- */
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEYS = {
@@ -20,58 +11,78 @@ const KEYS = {
 
 const DEFAULT_VERSION = 'NVI';
 
-// ─── Versão selecionada ───────────────────────────────────────────────────────
+// ─── Versão Selecionada ──────────────────────────────────────────────────────
 
 export async function getSelectedVersion() {
   try {
-    return (await AsyncStorage.getItem(KEYS.SELECTED_VERSION)) ?? DEFAULT_VERSION;
+    const version = await AsyncStorage.getItem(KEYS.SELECTED_VERSION);
+    return version ?? DEFAULT_VERSION;
   } catch {
     return DEFAULT_VERSION;
   }
 }
 
 export async function saveSelectedVersion(versionId) {
+  if (!versionId) return;
   try {
-    await AsyncStorage.setItem(KEYS.SELECTED_VERSION, versionId);
+    await AsyncStorage.setItem(KEYS.SELECTED_VERSION, String(versionId));
   } catch (_) {}
 }
 
-// ─── Posição de leitura ───────────────────────────────────────────────────────
-// Equivalente: BibleReadingPreferencesRepository.ReadingPosition
+// ─── Posição de Leitura (Persistence Layer) ──────────────────────────────────
 
+/**
+ * Salva a posição atômica usando multiSet para garantir integridade.
+ */
 export async function saveReadingPosition({ bookId, bookName, shortName, chapter, verse = 0 }) {
+  if (!bookId || !chapter) return;
+
+  const data = [
+    [KEYS.LAST_BOOK_ID,    String(bookId)],
+    [KEYS.LAST_BOOK_NAME,  String(bookName)],
+    [KEYS.LAST_SHORT_NAME, String(shortName)],
+    [KEYS.LAST_CHAPTER,    String(chapter)],
+    [KEYS.LAST_VERSE,      String(verse)],
+  ];
+
   try {
-    await AsyncStorage.multiSet([
-      [KEYS.LAST_BOOK_ID,    String(bookId)],
-      [KEYS.LAST_BOOK_NAME,  bookName],
-      [KEYS.LAST_SHORT_NAME, shortName],
-      [KEYS.LAST_CHAPTER,    String(chapter)],
-      [KEYS.LAST_VERSE,      String(verse)],
-    ]);
+    await AsyncStorage.multiSet(data);
   } catch (_) {}
 }
 
+/**
+ * Recupera e valida a última posição. 
+ * Retorna null se os dados essenciais (book/chapter) forem matematicamente inválidos.
+ */
 export async function getReadingPosition() {
   try {
-    const pairs = await AsyncStorage.multiGet([
+    const keysToFetch = [
       KEYS.LAST_BOOK_ID,
       KEYS.LAST_BOOK_NAME,
       KEYS.LAST_SHORT_NAME,
       KEYS.LAST_CHAPTER,
       KEYS.LAST_VERSE,
-    ]);
-    const map = Object.fromEntries(pairs);
-    const bookId  = parseInt(map[KEYS.LAST_BOOK_ID]  ?? '0', 10);
-    const chapter = parseInt(map[KEYS.LAST_CHAPTER]   ?? '0', 10);
+    ];
 
-    if (!bookId || !chapter) return null; // isValid() === false
+    const pairs = await AsyncStorage.multiGet(keysToFetch);
+    const map = Object.fromEntries(pairs);
+
+    // Conversão e validação numérica direta
+    const bookId  = Number(map[KEYS.LAST_BOOK_ID]);
+    const chapter = Number(map[KEYS.LAST_CHAPTER]);
+    const verse   = Number(map[KEYS.LAST_VERSE] || 0);
+
+    // Validação de integridade: 0 ou NaN são considerados inválidos aqui
+    if (!bookId || !chapter) {
+      return null;
+    }
 
     return {
       bookId,
-      bookName:  map[KEYS.LAST_BOOK_NAME]  ?? '',
-      shortName: map[KEYS.LAST_SHORT_NAME] ?? '',
       chapter,
-      verse: parseInt(map[KEYS.LAST_VERSE] ?? '0', 10),
+      verse,
+      bookName:  map[KEYS.LAST_BOOK_NAME]  || '',
+      shortName: map[KEYS.LAST_SHORT_NAME] || '',
     };
   } catch {
     return null;
@@ -80,12 +91,6 @@ export async function getReadingPosition() {
 
 export async function clearReadingPosition() {
   try {
-    await AsyncStorage.multiRemove([
-      KEYS.LAST_BOOK_ID,
-      KEYS.LAST_BOOK_NAME,
-      KEYS.LAST_SHORT_NAME,
-      KEYS.LAST_CHAPTER,
-      KEYS.LAST_VERSE,
-    ]);
+    await AsyncStorage.multiRemove(Object.values(KEYS).filter(k => k !== KEYS.SELECTED_VERSION));
   } catch (_) {}
 }

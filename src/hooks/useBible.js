@@ -1,5 +1,7 @@
 /**
- * useBible.js — atualizado para BibleService assíncrono
+ * useBible.js
+ * Hook customizado para encapsular a lógica de negócio da Bíblia.
+ * Gerencia o estado da versão selecionada, navegação de livros e persistência de leitura.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -18,6 +20,7 @@ import {
 } from '../services/BibleStorage';
 import { BIBLE_VERSIONS } from '../utils/constants/Bibles';
 
+// Filtros de testamento para abstrair IDs mágicos do banco de dados
 export const TESTAMENT_FILTER = { ALL: 'all', OLD: 'old', NEW: 'new' };
 
 export function useBible() {
@@ -31,7 +34,10 @@ export function useBible() {
   const [loadingChapters, setLoadingChapters] = useState(false);
   const [lastPosition, setLastPosition]    = useState(null);
 
-  // ─── Init: carrega versão salva + posição ─────────────────────────────────
+  /**
+   * Inicialização: Recupera a preferência do usuário e a última posição de leitura
+   * armazenadas no AsyncStorage ao montar o componente.
+   */
   useEffect(() => {
     async function init() {
       const savedId = await getSelectedVersion();
@@ -44,7 +50,10 @@ export function useBible() {
     init();
   }, []);
 
-  // ─── Carrega livros quando versão ou filtro muda ──────────────────────────
+  /**
+   * Efeito de Carregamento: Disparado sempre que a versão da bíblia ou o filtro
+   * de testamento é alterado. Sincroniza o estado local com o SQLite.
+   */
  useEffect(() => {
   if (!version) return;
 
@@ -52,6 +61,7 @@ export function useBible() {
     setLoadingBooks(true);
     try {
       let list;
+        // Lógica de filtragem delegada à camada de serviço (SQLite)
       if (testamentFilter === TESTAMENT_FILTER.OLD) {
         list = await getBooksByTestament(version.file, 1);
       } else if (testamentFilter === TESTAMENT_FILTER.NEW) {
@@ -73,12 +83,18 @@ export function useBible() {
   load();
 }, [version, testamentFilter]); // sem dependência de loadBooks
 
+  /**
+   * Altera a versão ativa e persiste a escolha para futuras sessões.
+   */
   const selectVersion = useCallback(async (v) => {
     setVersionState(v);
     setBooks([]); // limpa lista enquanto carrega nova versão
     await saveSelectedVersion(v.id);
   }, []);
 
+  /**
+   * Seleciona um livro e busca seus respectivos capítulos no SQLite.
+   */
   const selectBook = useCallback(async (book) => {
     setSelectedBook(book);
     setLoadingChapters(true);
@@ -93,11 +109,17 @@ export function useBible() {
     }
   }, [version]);
 
+  /**
+   * Persiste a posição exata da leitura (Livro, Capítulo, Versículo).
+   */
   const persistPosition = useCallback(async (pos) => {
     await saveReadingPosition(pos);
     setLastPosition(pos);
   }, []);
 
+  /**
+   * Remove o marcador de última leitura.
+   */
   const clearPosition = useCallback(async () => {
     await clearReadingPosition();
     setLastPosition(null);
