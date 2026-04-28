@@ -161,7 +161,8 @@ src/
 │   │   └── EventoModal.js    # Modal de detalhe de eventos
 │   ├── bible/
 │   │   └── VersionSelector.js
-│   └── CustomDrawerContent.js 
+│   └── navigation/
+│        └── CustomDrawerContent.js 
 │         
 ├── themes/
 │   └── index.js               # Tokens de design (Dark/Light)
@@ -178,17 +179,23 @@ src/
 
 ## 🛠️ Stack Técnica
 
-| Camada | Tecnologia |
-|---|---|
-| Framework | React Native 0.74.5 |
-| Autenticação | Firebase Auth (`@react-native-firebase/auth` v20) |
-| Banco de dados cloud | Cloud Firestore (`@react-native-firebase/firestore` v20) |
-| Banco de dados local | SQLite via `@op-engineering/op-sqlite` |
-| Persistência local | AsyncStorage |
-| Navegação | React Navigation 7 (Stack + Drawer) |
-| Notificações | Notifee (trigger notifications com AlarmManager) |
-| HTTP Client | Axios (versículo do dia — bible-api.com) |
-| Animações | React Native Animated API |
+| Camada | Tecnologia | Versão |
+|---|---|---|
+| Framework | React Native | 0.74.5 |
+| Autenticação | `@react-native-firebase/auth` | 20.5.0 |
+| Banco de dados cloud | `@react-native-firebase/firestore` | 20.5.0 |
+| Storage cloud | `@react-native-firebase/storage` | 20.5.0 |
+| Banco de dados local | `@op-engineering/op-sqlite` | 8.0.3 |
+| Persistência local | `@react-native-async-storage/async-storage` | 1.24.0 |
+| Navegação | `@react-navigation/native` + `drawer` + `native-stack` | 6.x |
+| Notificações | `@notifee/react-native` | 9.1.8 |
+| Animações | `react-native-reanimated` | 3.10.1 |
+| Gestos | `react-native-gesture-handler` | 2.16.1 |
+| HTTP Client | `axios` | 1.15.2 |
+| Splash Screen | `react-native-bootsplash` | 7.3.1 |
+| Ícones | `react-native-vector-icons` | 10.3.0 |
+| Clipboard | `@react-native-clipboard/clipboard` | 1.16.3 |
+| Picker | `@react-native-picker/picker` | 2.11.4 |
 
 <br>
 
