@@ -1,79 +1,123 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# ---
 
-# Getting Started
+**🚀 Projeto Finanças \- React Native**
 
->**Note**: Make sure you have completed the [React Native - Environment Setup](https://reactnative.dev/docs/environment-setup) instructions till "Creating a new application" step, before proceeding.
+Este projeto é um ecossistema de controle financeiro pessoal, desenvolvido com foco em arquitetura modular, alta performance de banco de dados local e sincronização em nuvem.
 
-## Step 1: Start the Metro Server
+## **🏗️ Arquitetura do Sistema**
 
-First, you will need to start **Metro**, the JavaScript _bundler_ that ships _with_ React Native.
+O app foi construído seguindo princípios de separação de responsabilidades (Clean Architecture), garantindo que a lógica de interface não se misture com a lógica de dados.
 
-To start Metro, run the following command from the _root_ of your React Native project:
+### **Fluxo de Dados (Engenharia)**
 
-```bash
-# using npm
-npm start
+1. **UI (React Native)**: Camada de interface utilizando useAppTheme para consistência visual (IEC Mutua Style).  
+2. **Service Layer**:  
+   * BibleService.js: Gerenciamento de SQLite local de alta performance.  
+   * api.js: Instância Axios com tratamento matemático de erros.  
+3. **Persistence Layer**:  
+   * AsyncStorage: Armazenamento de estados e preferências de leitura.  
+   * op-sqlite: Motor de banco de dados SQL nativo.  
+4. **Cloud Layer**:  
+   * Firebase Auth: Autenticação e segurança.  
+   * Firestore: Sincronização de pedidos e dados de usuários.
 
-# OR using Yarn
-yarn start
-```
+## ---
 
-## Step 2: Start your Application
+**💾 Recursos e Documentação**
 
-Let Metro Bundler run in its _own_ terminal. Open a _new_ terminal from the _root_ of your React Native project. Run the following command to start your _Android_ or _iOS_ app:
+### **📂 Banco de Dados & Assets**
 
-### For Android
+Devido ao tamanho das variações de versões e arquivos .db, o banco de dados completo está hospedado externamente.
 
-```bash
-# using npm
-npm run android
+🔗 [**BAIXAR BANCO DE DATOS (Google Drive)**](https://www.google.com/search?q=https://drive.google.com/drive/folders/1ZCMlu4jjkgjF5FE2hSosqMPlT_QVA8Jt?usp=sharing)
 
-# OR using Yarn
-yarn android
-```
+### **🎥 Demonstração em Vídeo**
 
-### For iOS
+Confira o fluxo de funcionamento, performance de transição de capítulos e integração com Firebase.
 
-```bash
-# using npm
-npm run ios
+📺 [**ASSISTIR VÍDEO NO YOUTUBE**](https://www.google.com/search?q=COLOCAR_SEU_LINK_AQUI)
 
-# OR using Yarn
-yarn ios
-```
+## ---
 
-If everything is set up _correctly_, you should see your new app running in your _Android Emulator_ or _iOS Simulator_ shortly provided you have set up your emulator/simulator correctly.
+**🛠️ Esqueleto Técnico (Conexões e Fluxo)**
 
-This is one way to run your app — you can also run it directly from within Android Studio and Xcode respectively.
+Abaixo, a representação da arquitetura de dados e dos serviços que sustentam a lógica do App **IEC de Mutuá**:
 
-## Step 3: Modifying your App
+#### **📖 Motor da Bíblia (Local SQLite)**
 
-Now that you have successfully run the app, let's modify it.
+Diferente de APIs REST comuns, o acesso às Escrituras é feito via **op-sqlite** para garantir leitura instantânea offline.
 
-1. Open `App.tsx` in your text editor of choice and edit some lines.
-2. For **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Developer Menu** (<kbd>Ctrl</kbd> + <kbd>M</kbd> (on Window and Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (on macOS)) to see your changes!
+![Arquitetura SQLite e Configurações](.\screenshots\Gemini_Generated_Image_wg0k13wg0k13wg0k.png)
 
-   For **iOS**: Hit <kbd>Cmd ⌘</kbd> + <kbd>R</kbd> in your iOS Simulator to reload the app and see your changes!
+5. **openBible(versionFile)**: Gerencia a montagem dinâmica do banco de dados a partir dos assets.  
+6. **getVerses(book, chapter)**: Consulta SQL otimizada para recuperação de textos.  
+7. **getPrevious/NextChapter**: Lógica matemática para navegação entre livros e testamentos.
 
-## Congratulations! :tada:
+#### **☁️ Cloud & Interação (Firebase/Firestore)**
 
-You've successfully run and modified your React Native App. :partying_face:
+Estrutura NoSQL para gerenciamento de comunidade, agenda e pedidos de oração.
 
-### Now what?
+![Estrutura Completa do Firestore](.\screenshots\Gemini_Generated_Image_sjivrnsjivrnsjiv.png)
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [Introduction to React Native](https://reactnative.dev/docs/getting-started).
+* **Coleções principais**: `agenda`, `pastores`, `pedidos` e `users`.
+* **Segurança**: Regras de acesso baseadas no UID do Firebase Auth.
 
-# Troubleshooting
+Endpoints lógicos utilizados para gerenciar a comunidade e persistência de usuário:
 
-If you can't get this to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+2. **Autenticação (auth)**:  
+   * signIn/signUp: Gerenciamento de acesso via Firebase Auth.  
+   * onAuthStateChanged: Listener para persistência de sessão.  
+3. **Pedidos de Oração (/prayers)**:  
+   * POST /prayers: Envio de novo pedido com categoria e status pending.  
+   * GET /prayers: Recuperação de pedidos vinculados ao UID do usuário.  
+   * UPDATE /status: Alteração lógica de pedidos (Lido/Arquivado).
 
-# Learn More
+#### **⚙️ Configurações e Preferências (AsyncStorage)**
 
-To learn more about React Native, take a look at the following resources:
+Persistência de estado local para garantir que o usuário retorne exatamente onde parou:
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+* **SELECTED\_VERSION**: Armazena o ID da versão ativa (ex: 'NVI', 'ARA').  
+* **READING\_POSITION**: Objeto matemático contendo bookId, chapter e verse.  
+* **THEME\_MODE**: Persistência da preferência visual (Claro/Escuro).
+
+#### **🔗 Serviços Externos (Axios)**
+
+* **baseURL: https://bible-api.com/**: Fallback para consultas de versículos online e ferramentas de "Versículo do Dia".
+
+### ---
+
+**Por que essa estrutura?**
+
+* **Matemática de Performance**: O banco local elimina o "loading" ao virar as páginas da Bíblia.  
+* **Segurança Cloud**: O Firebase isola os dados sensíveis dos fiéis em um ambiente criptografado.  
+* **Experiência do Usuário**: O AsyncStorage garante que o app seja "inteligente" e lembre das preferências sem precisar de login constante.
+
+## 
+
+## ---
+
+**🎨 Identidade Visual (Tokens)**
+
+O projeto utiliza uma paleta sóbria baseada na **IEC de Mutua**:
+
+* **Primary**: \#C9A84C (Dourado)  
+* **Background**: \#F5F5F5 (Light) / \#121212 (Dark)  
+* **Surface**: Design baseado em Cards para fácil leitura de fluxos financeiros.
+
+## ---
+
+**🚀 Como Rodar o Projeto**
+
+1. Clone o repositório.  
+2. Instale as dependências: yarn install.  
+3. Configure o arquivo de banco de dados na pasta assets/bibles.  
+4. Execute o Metro Bundler: npx react-native start.  
+5. Inicie no emulador: npx react-native run-android.
+
+---
+
+**Desenvolvido por um Desenvolvedor Junior focado em Mobile e Automação de Dados.**
+
+### ---
+
+
