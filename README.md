@@ -227,7 +227,7 @@ A Bíblia funciona **100% offline** via banco SQLite empacotado no app:
 ## ☁️ Estrutura do Firestore
 
 ```
-/agenda/{eventoId}
+/agenda/{evento(number)}
   ├── name: string
   ├── dateStart: timestamp
   ├── dateEnd: timestamp
@@ -241,24 +241,37 @@ A Bíblia funciona **100% offline** via banco SQLite empacotado no app:
   ├── verse: string
   └── imageUrl: string
 
-/users/{uid}
+/users/{usersId}
+  ├── birthDate: timestamp
+  ├── createdAt: timestamp
+  ├── createdBy: string
+  ├── email: string
+  ├── name: string
+  ├── phone: string
+  ├── weddingAnniversary: timestamp
   └── role: "visitante" | "pendente" | "membro" | "admin"
 
-/pedidos/{pedidoId}
-  ├── category: string
-  ├── text: string
-  ├── sigiloso: boolean
-  ├── uid: string
-  └── createdAt: timestamp
+/pedidos/{pedidosId}
+  ├── categoria: string
+  ├── dataCriacao: timestamp
+  ├── isPrivado: boolean
+  ├── status: "pending" | "sent" | "archived"
+  ├── texto: string
+  ├── userName:string
+  └── userId: string
+  
 
-/churches/{churchId}
-  ├── group: string
+/churches/iecdemutu/addresses/{address(number)}
+  ├── order: int64
+  ├── name: string
   └── address: string
 
 /pastores/{pastorId}
-  ├── name: string
-  ├── role: string
-  └── bio: string
+  ├── nome: string
+  ├── cargo: string
+  ├── fotoUrl: string
+  ├── bio: string
+  └── ordem: int64
 ```
 
 <br>
