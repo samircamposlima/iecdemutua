@@ -339,4 +339,4 @@ cd android
 
 ---
 
-*Desenvolvido por um Desenvolvedor Junior focado em Mobile — React Native & Android/Kotlin.*
+*Desenvolvido por Samir Campos Lima — React Native Developer | linkedin.com/in/Samir-Dev*
